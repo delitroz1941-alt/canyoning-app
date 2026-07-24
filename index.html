@@ -807,7 +807,7 @@ function saveSeason(){ try{ localStorage.setItem(STORAGE_SEASON, JSON.stringify(
 let season = loadSeason();
 
 const STORAGE_SYNC_URL = 'canyoning_sync_url_v1';
-const DEFAULT_SYNC_URL = 'https://script.google.com/macros/s/AKfycbxW8PSqcsziP54Srj6K63qFdwsEK2gI_CC473ntUorvFUsoQvfrk0m6jkfsGGzCHV1Jfg/exec';
+const DEFAULT_SYNC_URL = 'https://script.google.com/macros/s/AKfycbxkKKpvxbyJFO3eHYINAI8VfQ-13OILbE3X8g2u-r0yHLeJLn8ITZvWmmwo3H-ICXQTRA/exec';
 function loadSyncUrl(){ try{ return localStorage.getItem(STORAGE_SYNC_URL) || DEFAULT_SYNC_URL; }catch(e){ return DEFAULT_SYNC_URL; } }
 function saveSyncUrl(url){ try{ localStorage.setItem(STORAGE_SYNC_URL, url); }catch(e){} }
 let syncUrl = loadSyncUrl();
