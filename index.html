@@ -1,0 +1,1448 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#1F4E78">
+<title>Tarif Canyoning</title>
+<style>
+  :root{
+    --bleu-fonce:#1F4E78;
+    --bleu:#2E75B6;
+    --bleu-clair:#EAF2FA;
+    --vert:#1E7E34;
+    --vert-clair:#D9EAD3;
+    --rouge:#CC0000;
+    --rouge-clair:#FBE1E1;
+    --gris:#6B7280;
+    --gris-clair:#F4F5F7;
+    --jaune:#FFF2CC;
+    --bord:#E1E4E8;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+    background:var(--gris-clair);
+    color:#1a1a1a;
+    padding-bottom:40px;
+  }
+  header{
+    background:var(--bleu-fonce);
+    color:white;
+    padding:18px 16px 14px;
+    position:sticky;
+    top:0;
+    z-index:10;
+    box-shadow:0 2px 6px rgba(0,0,0,0.15);
+  }
+  header h1{
+    margin:0 0 12px;
+    font-size:18px;
+    font-weight:700;
+    text-align:center;
+  }
+  .tabs{
+    display:flex;
+    background:rgba(255,255,255,0.15);
+    border-radius:10px;
+    padding:4px;
+    gap:4px;
+  }
+  .tab-btn{
+    flex:1;
+    border:none;
+    background:transparent;
+    color:rgba(255,255,255,0.85);
+    padding:10px 6px;
+    border-radius:8px;
+    font-size:14px;
+    font-weight:600;
+    cursor:pointer;
+  }
+  .tab-btn.active{
+    background:white;
+    color:var(--bleu-fonce);
+  }
+  .mode-btn{
+    flex:1;
+    border:none;
+    background:transparent;
+    padding:10px 6px;
+    border-radius:8px;
+    font-size:13px;
+    font-weight:600;
+    cursor:pointer;
+  }
+  .mode-btn.active{
+    background:white;
+  }
+  main{padding:14px;max-width:520px;margin:0 auto;}
+  .page{display:none;}
+  .page.active{display:block;}
+
+  .card{
+    background:white;
+    border-radius:14px;
+    padding:14px;
+    margin-bottom:14px;
+    box-shadow:0 1px 3px rgba(0,0,0,0.08);
+    border:1px solid var(--bord);
+  }
+  .card h2{
+    font-size:13px;
+    text-transform:uppercase;
+    letter-spacing:.03em;
+    color:white;
+    background:var(--bleu-fonce);
+    margin:-14px -14px 12px;
+    padding:9px 14px;
+    border-radius:14px 14px 0 0;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+  }
+  .card h2.alt{background:var(--bleu);}
+  .card h2 .mini-btn{
+    text-transform:none;
+    font-size:11.5px;
+    background:rgba(255,255,255,0.25);
+    border:none;
+    color:white;
+    padding:4px 9px;
+    border-radius:12px;
+    cursor:pointer;
+    font-weight:600;
+  }
+
+  .field{margin-bottom:12px;}
+  .field:last-child{margin-bottom:0;}
+  label{
+    display:block;
+    font-size:13px;
+    font-weight:600;
+    color:var(--gris);
+    margin-bottom:5px;
+  }
+  select, input[type=number], input[type=date], input[type=text]{
+    width:100%;
+    padding:11px 12px;
+    font-size:16px;
+    border:1.5px solid var(--bord);
+    border-radius:9px;
+    background:var(--jaune);
+    font-weight:600;
+    color:#1a1a1a;
+  }
+  select:focus, input:focus{outline:2px solid var(--bleu);}
+
+  .row2{display:flex;gap:10px;}
+  .row2 > div{flex:1;}
+
+  .result-line{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:8px 0;
+    border-bottom:1px solid var(--bord);
+    font-size:14.5px;
+  }
+  .result-line:last-child{border-bottom:none;}
+  .result-line .lbl{color:#444;}
+  .result-line .val{font-weight:700;font-variant-numeric:tabular-nums;}
+  .result-line.neg .val{color:var(--rouge);}
+  .result-line.total .val{font-size:17px;}
+  .result-line.highlight{
+    background:var(--vert-clair);
+    margin:6px -14px -6px;
+    padding:10px 14px;
+    border-radius:0 0 12px 12px;
+  }
+  .result-line.highlight.neg{background:var(--rouge-clair);}
+
+  .guide-table{width:100%;border-collapse:collapse;font-size:12.5px;}
+  .guide-table th{
+    background:var(--bleu);
+    color:white;
+    padding:7px 3px;
+    font-size:11px;
+    font-weight:600;
+  }
+  .guide-table td{
+    padding:6px 3px;
+    text-align:center;
+    border-bottom:1px solid var(--bord);
+  }
+  .guide-table td.nom-cell{text-align:left;}
+  .guide-table input[type=text]{
+    padding:6px 5px;
+    font-size:12.5px;
+    background:white;
+  }
+  .guide-table select{
+    padding:6px 1px;
+    font-size:12.5px;
+    text-align:center;
+  }
+  .guide-table .salaire{font-weight:700;white-space:nowrap;}
+  .guide-table .salaire.neg{color:var(--rouge);}
+  .col-c2{transition:opacity .2s;}
+  .col-c2.hidden-col{display:none;}
+
+  .info-note{
+    font-size:12px;
+    color:var(--gris);
+    background:var(--bleu-clair);
+    padding:9px 11px;
+    border-radius:9px;
+    margin-top:10px;
+    line-height:1.4;
+  }
+  .badge{
+    display:inline-block;
+    font-size:11.5px;
+    padding:2px 8px;
+    border-radius:20px;
+    background:var(--bleu-clair);
+    color:var(--bleu-fonce);
+    font-weight:600;
+    margin-left:6px;
+  }
+  .badge.warn{background:#FDECEA;color:#B02A1E;}
+  footer{
+    text-align:center;
+    font-size:11px;
+    color:#9aa0a6;
+    padding:10px 0 4px;
+  }
+
+  .btn{
+    display:block;
+    width:100%;
+    padding:13px;
+    border:none;
+    border-radius:10px;
+    font-size:15px;
+    font-weight:700;
+    cursor:pointer;
+    margin-top:8px;
+  }
+  .btn-primary{background:var(--bleu-fonce);color:white;}
+  .btn-secondary{background:var(--bleu-clair);color:var(--bleu-fonce);}
+  .btn-danger{background:var(--rouge-clair);color:#B02A1E;}
+  .btn-row{display:flex;gap:8px;}
+  .btn-row .btn{margin-top:0;}
+  #c2_card{display:none;}
+  #c2_card.show{display:block;}
+
+  .day-entry{
+    padding:12px 0;
+    border-bottom:1px solid var(--bord);
+    font-size:13px;
+  }
+  .day-entry:last-child{border-bottom:none;}
+  .day-entry .dhead{
+    display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;
+  }
+  .day-entry .dhead .ddate{font-weight:700;font-size:14.5px;}
+  .day-entry .dcanyon{color:#444;margin-bottom:2px;}
+  .day-entry .dguides{color:var(--gris);margin-top:4px;}
+  .day-entry .dresultat{font-weight:700;margin-top:5px;}
+  .day-entry .dresultat.neg{color:var(--rouge);}
+  .day-entry .dresultat.pos{color:var(--vert);}
+  .del-day-btn{
+    background:none;border:none;color:#B02A1E;font-size:19px;
+    padding:2px 8px;cursor:pointer;line-height:1;
+  }
+  .empty-msg{color:var(--gris);font-size:13px;text-align:center;padding:16px 0;}
+
+  .summary-box{
+    background:var(--bleu-clair);
+    border-radius:10px;
+    padding:10px 12px;
+    margin-top:0;
+    font-size:13px;
+  }
+  .summary-box .sline{display:flex;justify-content:space-between;padding:3px 0;}
+  .summary-box .sline b{font-variant-numeric:tabular-nums;}
+
+  .guide-summary-table{width:100%;border-collapse:collapse;font-size:13px;margin-top:4px;}
+  .guide-summary-table th{background:var(--bleu);color:white;padding:6px 4px;font-size:11.5px;text-align:left;}
+  .guide-summary-table td{padding:6px 4px;border-bottom:1px solid var(--bord);}
+  .guide-summary-table td.num{text-align:right;font-weight:700;}
+
+  #import-file, #restore-file{display:none;}
+  .toast{
+    position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
+    background:#1a1a1a;color:white;padding:10px 18px;border-radius:20px;
+    font-size:13px;z-index:100;opacity:0;transition:opacity .25s;pointer-events:none;
+    max-width:85%;text-align:center;
+  }
+  .toast.show{opacity:1;}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Esprit Liberté — Canyoning</h1>
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="pj">Journée</button>
+    <button class="tab-btn" data-tab="ps">Saison</button>
+  </div>
+</header>
+
+<main>
+
+<!-- ============ PAGE JOURNÉE (calcul + saisie unifiés) ============ -->
+<div class="page active" id="pj">
+
+  <div class="card" id="edit_banner" style="display:none;background:var(--jaune);border-color:#E8C766;">
+    <h2 style="background:#B4740E;">Modification d'une journée</h2>
+    <div style="font-size:13px;color:#7A4E00;margin-bottom:8px;">Tu modifies une journée déjà enregistrée. Enregistre pour remplacer l'ancienne version, ou annule.</div>
+    <button class="btn btn-secondary" id="cancel_edit" style="margin-top:0;">Annuler la modification</button>
+  </div>
+
+  <div class="tabs" style="background:var(--gris-clair);border:1px solid var(--bord);margin-bottom:14px;">
+    <button class="mode-btn active" data-mode="standard" style="color:var(--bleu-fonce);">Mode standard</button>
+    <button class="mode-btn" data-mode="manuel" style="color:var(--bleu-fonce);">Mode manuel (grosse journée)</button>
+  </div>
+
+  <div class="card">
+    <h2>Date</h2>
+    <div class="field">
+      <input type="date" id="j_date">
+    </div>
+  </div>
+
+  <div id="standard_mode">
+
+  <div class="card">
+    <h2 class="alt">Guide principal de la journée</h2>
+    <div class="field">
+      <select id="day_principal_who">
+        <option>Antoine</option>
+        <option>Daniel</option>
+        <option>Johann</option>
+        <option>François</option>
+        <option>Extra</option>
+      </select>
+      <input type="text" id="day_principal_extra_nom" placeholder="Nom de l'extra" style="display:none;margin-top:6px;">
+    </div>
+    <div class="info-note">C'est ce guide qui collecte le paiement et reverse le solde à Esprit Liberté, quel que soit le(s) canyon(s) qu'il encadre.</div>
+  </div>
+
+  <div class="card" id="c1_card">
+    <h2>Canyon 1 (matin)</h2>
+    <div class="row2">
+      <div class="field">
+        <label>Parcours</label>
+        <select id="c1_parcours">
+          <option>Initiation</option>
+          <option>Découverte</option>
+          <option>Intégral</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Nb clients</label>
+        <input type="number" id="c1_nb" value="9" min="1" max="25">
+      </div>
+    </div>
+    <div class="field">
+      <label>Paiement</label>
+      <select id="c1_paiement">
+        <option>Payé cash</option>
+        <option>À facturer</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2 class="alt">Canyon 1 (matin) — guides</h2>
+    <table class="guide-table">
+      <thead><tr><th>Guide</th><th style="text-align:right;">Salaire</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="nom-cell">
+            <select id="c1_g1_who">
+              <option>Antoine</option><option>Daniel</option><option>Johann</option><option>François</option><option>Extra</option><option>Aucun</option>
+            </select>
+            <input type="text" id="c1_g1_extra_nom" placeholder="Nom de l'extra" style="display:none;margin-top:4px;">
+          </td>
+          <td class="salaire" id="c1_g1_sal" style="text-align:right;">-</td>
+        </tr>
+        <tr>
+          <td class="nom-cell">
+            <select id="c1_g2_who">
+              <option>Aucun</option><option>Antoine</option><option>Daniel</option><option>Johann</option><option>François</option><option>Extra</option>
+            </select>
+            <input type="text" id="c1_g2_extra_nom" placeholder="Nom de l'extra" style="display:none;margin-top:4px;">
+          </td>
+          <td class="salaire" id="c1_g2_sal" style="text-align:right;">-</td>
+        </tr>
+        <tr>
+          <td class="nom-cell">
+            <select id="c1_g3_who">
+              <option>Aucun</option><option>Antoine</option><option>Daniel</option><option>Johann</option><option>François</option><option>Extra</option>
+            </select>
+            <input type="text" id="c1_g3_extra_nom" placeholder="Nom de l'extra" style="display:none;margin-top:4px;">
+          </td>
+          <td class="salaire" id="c1_g3_sal" style="text-align:right;">-</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="info-note">Guides recommandés pour ce canyon : <b id="reco1">-</b>.</div>
+  </div>
+
+  <button class="btn btn-secondary" id="toggle_c2">+ Ajouter un 2ème canyon (après-midi)</button>
+
+  <div class="card" id="c2_card">
+    <h2 class="alt">Canyon 2 (après-midi)<button class="mini-btn" id="remove_c2">Retirer</button></h2>
+    <div class="row2">
+      <div class="field">
+        <label>Parcours</label>
+        <select id="c2_parcours">
+          <option>Initiation</option>
+          <option selected>Découverte</option>
+          <option>Intégral</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Nb clients</label>
+        <input type="number" id="c2_nb" value="12" min="1" max="25">
+      </div>
+    </div>
+    <div class="field">
+      <label>Paiement</label>
+      <select id="c2_paiement">
+        <option>Payé cash</option>
+        <option>À facturer</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="card col-c2 hidden-col" id="c2_guides_card">
+    <h2 class="alt">Canyon 2 (après-midi) — guides</h2>
+    <table class="guide-table">
+      <thead><tr><th>Guide</th><th style="text-align:right;">Salaire</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="nom-cell">
+            <select id="c2_g1_who">
+              <option>Aucun</option><option>Antoine</option><option>Daniel</option><option>Johann</option><option>François</option><option>Extra</option>
+            </select>
+            <input type="text" id="c2_g1_extra_nom" placeholder="Nom de l'extra" style="display:none;margin-top:4px;">
+          </td>
+          <td class="salaire" id="c2_g1_sal" style="text-align:right;">-</td>
+        </tr>
+        <tr>
+          <td class="nom-cell">
+            <select id="c2_g2_who">
+              <option>Aucun</option><option>Antoine</option><option>Daniel</option><option>Johann</option><option>François</option><option>Extra</option>
+            </select>
+            <input type="text" id="c2_g2_extra_nom" placeholder="Nom de l'extra" style="display:none;margin-top:4px;">
+          </td>
+          <td class="salaire" id="c2_g2_sal" style="text-align:right;">-</td>
+        </tr>
+        <tr>
+          <td class="nom-cell">
+            <select id="c2_g3_who">
+              <option>Aucun</option><option>Antoine</option><option>Daniel</option><option>Johann</option><option>François</option><option>Extra</option>
+            </select>
+            <input type="text" id="c2_g3_extra_nom" placeholder="Nom de l'extra" style="display:none;margin-top:4px;">
+          </td>
+          <td class="salaire" id="c2_g3_sal" style="text-align:right;">-</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="info-note">Guides recommandés pour ce canyon : <b id="reco2">-</b>. Un guide sélectionné dans les 2 canyons voit son salaire combiné automatiquement (-20% si &gt;650.-, plafond 1000.-).</div>
+  </div>
+
+  <div class="card">
+    <h2>Résultats</h2>
+    <div class="result-line"><span class="lbl">Prix total clients</span><span class="val" id="r_prix">-</span></div>
+    <div class="result-line"><span class="lbl">Matériel</span><span class="val" id="r_mat">-</span></div>
+    <div class="result-line"><span class="lbl">Bâtiment</span><span class="val" id="r_bat">-</span></div>
+    <div class="result-line total"><span class="lbl">Total salaire guides</span><span class="val" id="r_gtot">-</span></div>
+  </div>
+
+  <div class="card">
+    <h2 class="alt">Pour information</h2>
+    <div class="result-line" id="r_solde_line"><span class="lbl">Solde</span><span class="val" id="r_solde">-</span></div>
+    <div class="result-line highlight" id="r_resultat_line"><span class="lbl">Résultat esprit-liberté</span><span class="val" id="r_resultat">-</span></div>
+    <div class="info-note">Un guide qui fait les 2 canyons voit son salaire réduit de 20% si le total dépasse 650.-, plafonné à 1000.-/jour. Un guide qui ne fait qu'un seul canyon touche le tarif normal de ce canyon.</div>
+  </div>
+
+  </div><!-- /standard_mode -->
+
+  <div id="manual_mode" style="display:none;">
+
+    <div class="card">
+      <h2>Grosse journée — saisie manuelle</h2>
+      <div class="row2">
+        <div class="field">
+          <label>Nb clients</label>
+          <input type="number" id="m_nb" value="1" min="1">
+        </div>
+        <div class="field">
+          <label>Montant payé</label>
+          <input type="number" id="m_montant" value="0" min="0">
+        </div>
+      </div>
+      <div class="field">
+        <label>Paiement</label>
+        <select id="m_paiement">
+          <option>Payé cash</option>
+          <option>À facturer</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 class="alt">Guides</h2>
+      <table class="guide-table">
+        <thead><tr><th>Qui</th><th style="text-align:right;">Salaire</th></tr></thead>
+        <tbody>
+          <tr>
+            <td class="nom-cell">
+              <select id="m_g1_who"><option>Aucun</option><option>Antoine</option><option>Daniel</option><option>Johann</option><option>François</option></select>
+            </td>
+            <td><input type="number" id="m_g1_sal" value="0" style="text-align:right;"></td>
+          </tr>
+          <tr>
+            <td class="nom-cell">
+              <select id="m_g2_who"><option>Aucun</option><option>Antoine</option><option>Daniel</option><option>Johann</option><option>François</option></select>
+            </td>
+            <td><input type="number" id="m_g2_sal" value="0" style="text-align:right;"></td>
+          </tr>
+          <tr>
+            <td class="nom-cell">
+              <select id="m_g3_who"><option>Aucun</option><option>Antoine</option><option>Daniel</option><option>Johann</option><option>François</option></select>
+            </td>
+            <td><input type="number" id="m_g3_sal" value="0" style="text-align:right;"></td>
+          </tr>
+          <tr>
+            <td class="nom-cell">
+              <select id="m_g4_who"><option>Aucun</option><option>Antoine</option><option>Daniel</option><option>Johann</option><option>François</option></select>
+            </td>
+            <td><input type="number" id="m_g4_sal" value="0" style="text-align:right;"></td>
+          </tr>
+          <tr>
+            <td class="nom-cell">
+              Extra : <input type="text" id="m_extra_nom" placeholder="nom (facultatif)" style="width:auto;display:inline-block;padding:4px 6px;font-size:12.5px;margin-top:4px;">
+            </td>
+            <td><input type="number" id="m_extra_sal" value="0" style="text-align:right;"></td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="info-note">Le 1er guide rempli (dans l'ordre du tableau) est considéré comme guide principal pour le suivi individuel (solde à verser).</div>
+    </div>
+
+    <div class="card">
+      <h2 class="alt">Résultats</h2>
+      <div class="result-line total"><span class="lbl">Total salaires</span><span class="val" id="m_gtot">-</span></div>
+      <div class="result-line highlight" id="m_solde_line"><span class="lbl">Solde Esprit Liberté</span><span class="val" id="m_solde">-</span></div>
+    </div>
+
+  </div><!-- /manual_mode -->
+
+  <div class="card">
+    <h2>Remarque (facultatif)</h2>
+    <div class="field">
+      <textarea id="j_remarque" rows="3" placeholder="ex: client blessé, matériel manquant, retard..." style="width:100%;box-sizing:border-box;font-family:inherit;font-size:14px;padding:8px;border:1px solid var(--bord);border-radius:8px;"></textarea>
+    </div>
+  </div>
+
+  <button class="btn btn-primary" id="save_day">✓ Enregistrer cette journée dans la saison</button>
+
+</div>
+
+<!-- ============ PAGE SAISON ============ -->
+<div class="page" id="ps">
+
+  <div class="card">
+    <h2 class="alt">Synchronisation (partagée entre guides)</h2>
+    <div class="info-note" id="sync_status">Pas encore configuré — chaque journée reste seulement sur ce téléphone.</div>
+    <button class="btn btn-primary" id="sync_now" style="margin-top:8px;">Synchroniser maintenant</button>
+    <div style="margin-top:10px;">
+      <a href="#" id="toggle_sync_advanced" style="font-size:13px;color:var(--bleu-fonce);text-decoration:underline;">Paramètres avancés</a>
+    </div>
+    <div id="sync_advanced" style="display:none;margin-top:10px;">
+      <div class="field">
+        <label>URL Google Sheet (Apps Script)</label>
+        <input type="text" id="sync_url" placeholder="https://script.google.com/macros/s/.../exec">
+      </div>
+      <button class="btn btn-secondary" id="save_sync_url">Enregistrer l'URL</button>
+      <button class="btn btn-secondary" id="reset_sync_url" style="margin-top:6px;">Réinitialiser l'URL par défaut</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Résumé de la saison</h2>
+    <div class="summary-box">
+      <div class="sline"><span>Jours enregistrés</span><b id="s_days">0</b></div>
+      <div class="sline"><span>Total clients</span><b id="s_clients">0</b></div>
+      <div class="sline"><span>Total payé cash</span><b id="s_cash">-</b></div>
+      <div class="sline"><span>Total à facturer</span><b id="s_facturer">-</b></div>
+      <div class="sline"><span>Total salaire guides</span><b id="s_guides">-</b></div>
+      <div class="sline"><span><b>Résultat esprit-liberté</b></span><b id="s_resultat">-</b></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2 class="alt">Comptabilités (4 guides + Esprit Liberté)</h2>
+    <table class="guide-summary-table" id="guide_summary_table">
+      <thead><tr><th>Compte</th><th>Jours</th><th style="text-align:right;">Total</th></tr></thead>
+      <tbody id="guide_summary_body"></tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>Comptabilité détaillée par guide</h2>
+    <div class="field">
+      <label>Choisir un guide</label>
+      <select id="detail_guide_select">
+        <option>Antoine</option>
+        <option>Daniel</option>
+        <option>Johann</option>
+        <option>François</option>
+        <option>Extra</option>
+      </select>
+    </div>
+    <table class="guide-summary-table" id="detail_guide_table">
+      <thead><tr><th>Date</th><th>Parcours</th><th>Clients</th><th style="text-align:right;">Salaire</th><th style="text-align:right;">Solde à verser</th></tr></thead>
+      <tbody id="detail_guide_body"></tbody>
+    </table>
+    <div class="empty-msg" id="detail_guide_empty">Ce guide n'a pas encore de journée enregistrée.</div>
+    <div class="info-note">Le "solde à verser à Esprit Liberté" n'apparaît que pour les journées où ce guide était <b>guide principal</b> : c'est lui qui encaisse et remet le solde (prix total du jour moins tous les salaires guides). Les autres n'ont que leur salaire à recevoir.</div>
+  </div>
+
+  <div class="card">
+    <h2>Détail par journée</h2>
+    <div id="days_list">
+      <div class="empty-msg">Aucune journée enregistrée pour l'instant.</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Export / Sauvegarde</h2>
+    <button class="btn btn-primary" id="export_xlsx">Exporter rapport Excel (.xlsx)</button>
+    <button class="btn btn-secondary" id="export_csv">Exporter CSV (sans internet)</button>
+    <div class="btn-row" style="margin-top:8px;">
+      <button class="btn btn-secondary" id="backup_json">Sauvegarde (.json)</button>
+      <button class="btn btn-secondary" id="restore_btn">Restaurer</button>
+    </div>
+    <button class="btn btn-danger" id="clear_season">Vider la saison</button>
+    <input type="file" id="restore-file" accept=".json">
+    <div class="info-note">La saison est sauvegardée automatiquement sur ce téléphone. La sauvegarde .json permet de restaurer exactement la saison (recommandé avant de vider ou de changer de téléphone). L'export Excel/CSV sert de rapport lisible, pas d'une sauvegarde exacte.</div>
+  </div>
+
+</div>
+
+</main>
+<footer>Esprit Liberté — Canyon Valsorey</footer>
+<div class="toast" id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+const DATA = {"const": {"Initiation": {"prix": 95, "mat": 30, "bat": 10}, "Découverte": {"prix": 150, "mat": 30, "bat": 10}, "Intégral": {"prix": 170, "mat": 30, "bat": 10}}, "guides": {"Initiation": [[200, 0, 0], [200, 0, 0], [250, 0, 0], [300, 0, 0], [300, 0, 0], [350, 0, 0], [350, 0, 0], [400, 0, 0], [450, 0, 0], [500, 0, 0], [400, 400, 0], [400, 400, 0], [400, 400, 0], [400, 400, 0], [400, 400, 0], [450, 450, 0], [450, 450, 0], [500, 500, 0], [500, 500, 0], [500, 500, 0], [450, 450, 450], [450, 450, 450], [500, 500, 500], [500, 500, 500], [500, 500, 500]], "Découverte": [[200, 0, 0], [300, 0, 0], [350, 0, 0], [450, 0, 0], [500, 0, 0], [550, 0, 0], [550, 0, 0], [600, 0, 0], [450, 450, 0], [500, 500, 0], [550, 550, 0], [550, 550, 0], [550, 550, 0], [550, 550, 0], [600, 600, 0], [600, 600, 0], [650, 650, 0], [650, 650, 0], [650, 650, 0], [650, 650, 0], [550, 550, 550], [550, 550, 550], [600, 600, 600], [600, 600, 600], [650, 650, 650]], "Intégral": [[200, 0, 0], [350, 0, 0], [400, 0, 0], [500, 0, 0], [550, 0, 0], [600, 0, 0], [650, 0, 0], [700, 0, 0], [550, 550, 0], [600, 600, 0], [650, 650, 0], [650, 650, 0], [700, 700, 0], [700, 700, 0], [750, 750, 0], [750, 750, 0], [650, 650, 650], [650, 650, 650], [650, 650, 650], [700, 700, 700], [700, 700, 700], [750, 750, 750], [750, 750, 750], [750, 750, 750], [750, 750, 750]]}};
+
+// ---- core calc primitives (validated) ----
+function fmt(n){
+  const s = Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g,"'");
+  return s + " .-";
+}
+function clampNb(n){ n=parseInt(n); if(isNaN(n)||n<1) n=1; if(n>25) n=25; return n; }
+function guideRates(parcours, nb){
+  nb = clampNb(nb);
+  return DATA.guides[parcours][nb-1];
+}
+function baseRate(parcours, nb){ return guideRates(parcours,nb)[0]; }
+function nbGuidesReco(parcours, nb){
+  const g = guideRates(parcours,nb);
+  return (g[0]>0?1:0)+(g[1]>0?1:0)+(g[2]>0?1:0);
+}
+function comboSalary(r1, r2){
+  const total = r1+r2;
+  const red = total > 650 ? total*0.8 : total;
+  return Math.min(red, 1000);
+}
+function guideSalary(a1, a2, r1, r2){
+  if(a1 && a2) return comboSalary(r1,r2);
+  if(a1) return r1;
+  if(a2) return r2;
+  return 0;
+}
+function canyonPrice(parcours, nb){ return clampNb(nb) * DATA.const[parcours].prix; }
+function canyonMat(parcours, nb){ return clampNb(nb) * DATA.const[parcours].mat; }
+function canyonBat(parcours, nb){ return clampNb(nb) * DATA.const[parcours].bat; }
+
+const GUIDE_ROSTER = ['Antoine','Daniel','Johann','François','Extra'];
+
+function toggleExtraInput(pfx){
+  const who = document.getElementById(pfx+'_who').value;
+  document.getElementById(pfx+'_extra_nom').style.display = (who === 'Extra') ? 'block' : 'none';
+}
+function slotNom(pfx, who){
+  if(who === 'Extra'){
+    const extra = document.getElementById(pfx+'_extra_nom').value.trim();
+    return extra ? extra : 'Extra';
+  }
+  return who;
+}
+function getSlotList(canyonPrefix){
+  // canyonPrefix: 'c1' or 'c2'
+  return ['g1','g2','g3'].map(g=>{
+    const pfx = canyonPrefix+'_'+g;
+    return {slotId: pfx, who: document.getElementById(pfx+'_who').value};
+  });
+}
+// Fusionne les sélections faites indépendamment pour Canyon 1 et Canyon 2 :
+// un même guide choisi dans les deux listes fait "combo" (canyon1 ET canyon2).
+// Le guide principal de la journée (responsable du solde) est ajouté même s'il
+// n'apparaît dans aucune des deux listes, pour que le solde reste attribué.
+function buildGuidesMap(nb1, nb2, p1, p2, r1, r2){
+  const map = {};
+  const addSlot = (s, canyonKey) => {
+    if(s.who === 'Aucun') return;
+    const nom = slotNom(s.slotId, s.who);
+    const key = s.who + (s.who === 'Extra' ? '::'+nom : '');
+    if(!map[key]) map[key] = {guideKey: s.who, nom, canyon1:false, canyon2:false, slotIds:[]};
+    map[key][canyonKey] = true;
+    map[key].slotIds.push(s.slotId);
+  };
+  getSlotList('c1').forEach(s=>addSlot(s,'canyon1'));
+  if(has2) getSlotList('c2').forEach(s=>addSlot(s,'canyon2'));
+
+  const principalWho = document.getElementById('day_principal_who').value;
+  const principalNom = principalWho === 'Extra'
+    ? (document.getElementById('day_principal_extra_nom').value.trim() || 'Extra')
+    : principalWho;
+  const principalKey = principalWho + (principalWho === 'Extra' ? '::'+principalNom : '');
+  if(!map[principalKey]) map[principalKey] = {guideKey: principalWho, nom: principalNom, canyon1:false, canyon2:false, slotIds:[]};
+
+  return Object.keys(map).map(key=>{
+    const g = map[key];
+    const salaire = guideSalary(g.canyon1, g.canyon2, r1, r2);
+    const nbClients = (g.canyon1?nb1:0) + (g.canyon2?nb2:0);
+    const parcoursLabel = [g.canyon1?p1:null, g.canyon2?p2:null].filter(Boolean).join(' + ');
+    return {guideKey:g.guideKey, nom:g.nom, canyon1:g.canyon1, canyon2:g.canyon2, salaire, nbClients,
+      parcours: parcoursLabel, estPrincipal: key===principalKey, slotIds:g.slotIds};
+  });
+}
+
+// ---- mode manuel (grosse journée) ----
+let journeeMode = 'standard';
+function setJourneeMode(mode){
+  journeeMode = mode;
+  document.getElementById('standard_mode').style.display = (mode === 'standard') ? 'block' : 'none';
+  document.getElementById('manual_mode').style.display = (mode === 'manuel') ? 'block' : 'none';
+  document.querySelectorAll('.mode-btn').forEach(b=>{
+    b.classList.toggle('active', b.dataset.mode === mode);
+  });
+  if(mode === 'manuel') calcManuel(); else calcJournee();
+}
+document.querySelectorAll('.mode-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>setJourneeMode(btn.dataset.mode));
+});
+
+function calcManuel(){
+  const montant = parseFloat(document.getElementById('m_montant').value) || 0;
+  let total = 0;
+  ['m_g1','m_g2','m_g3','m_g4'].forEach(pfx=>{
+    const who = document.getElementById(pfx+'_who').value;
+    const sal = parseFloat(document.getElementById(pfx+'_sal').value) || 0;
+    if(who !== 'Aucun') total += sal;
+  });
+  total += parseFloat(document.getElementById('m_extra_sal').value) || 0;
+  const solde = montant - total;
+  document.getElementById('m_gtot').textContent = fmt(total);
+  document.getElementById('m_solde').textContent = fmt(solde);
+  document.getElementById('m_solde_line').classList.toggle('neg', solde<0);
+}
+document.querySelectorAll('#manual_mode input, #manual_mode select').forEach(el=>{
+  el.addEventListener('input', calcManuel);
+});
+
+function currentManualDayRecord(existingId){
+  const date = document.getElementById('j_date').value;
+  const nb = clampNb2(document.getElementById('m_nb').value);
+  const montant = parseFloat(document.getElementById('m_montant').value) || 0;
+  const paiement = document.getElementById('m_paiement').value;
+  const canyons = [{n:1, moment:'Journée complète', parcours:'Grosse journée (manuel)', nb, paiement,
+    prix: montant, mat: 0, bat: 0}];
+  const guides = [];
+  ['m_g1','m_g2','m_g3','m_g4'].forEach(pfx=>{
+    const who = document.getElementById(pfx+'_who').value;
+    if(who === 'Aucun') return;
+    const sal = parseFloat(document.getElementById(pfx+'_sal').value) || 0;
+    guides.push({guideKey: who, nom: who, canyon1:true, canyon2:false, salaire: sal,
+      estPrincipal: false, nbClients: nb, parcours: 'Grosse journée'});
+  });
+  const extraNom = document.getElementById('m_extra_nom').value.trim();
+  const extraSal = parseFloat(document.getElementById('m_extra_sal').value) || 0;
+  if(extraNom || extraSal){
+    guides.push({guideKey:'Extra', nom: extraNom || 'Extra', canyon1:true, canyon2:false, salaire: extraSal,
+      estPrincipal: false, nbClients: nb, parcours: 'Grosse journée'});
+  }
+  if(guides.length > 0) guides[0].estPrincipal = true;
+  const salaireTotal = guides.reduce((s,g)=>s+g.salaire,0);
+  const resultat = montant - salaireTotal;
+  const id = existingId || (Date.now()+'_'+Math.random().toString(36).slice(2,7));
+  const remarque = document.getElementById('j_remarque').value.trim();
+  return {id, date, canyons, guides, synced:false, mode:'manuel', remarque,
+    totals:{prix:montant, mat:0, bat:0, salaireGuides:salaireTotal, solde:resultat, resultat}};
+}
+function clampNb2(n){ n=parseInt(n); if(isNaN(n)||n<0) n=0; return n; }
+
+// ---- state ----
+let has2 = false;
+let editingId = null;
+const STORAGE_SEASON = 'canyoning_saison_v1';
+function loadSeason(){
+  try{ const raw = localStorage.getItem(STORAGE_SEASON); return raw? JSON.parse(raw) : []; }catch(e){ return []; }
+}
+function saveSeason(){ try{ localStorage.setItem(STORAGE_SEASON, JSON.stringify(season)); }catch(e){} }
+let season = loadSeason();
+
+const STORAGE_SYNC_URL = 'canyoning_sync_url_v1';
+const DEFAULT_SYNC_URL = 'https://script.google.com/macros/s/AKfycbxW8PSqcsziP54Srj6K63qFdwsEK2gI_CC473ntUorvFUsoQvfrk0m6jkfsGGzCHV1Jfg/exec';
+function loadSyncUrl(){ try{ return localStorage.getItem(STORAGE_SYNC_URL) || DEFAULT_SYNC_URL; }catch(e){ return DEFAULT_SYNC_URL; } }
+function saveSyncUrl(url){ try{ localStorage.setItem(STORAGE_SYNC_URL, url); }catch(e){} }
+let syncUrl = loadSyncUrl();
+
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 2400);
+}
+function fmtDateFR(iso){
+  if(!iso) return '';
+  const [y,m,d] = iso.split('-');
+  return `${d}.${m}.${y}`;
+}
+
+// ---- toggle 2nd canyon ----
+function setHas2(v){
+  has2 = v;
+  document.getElementById('c2_card').classList.toggle('show', v);
+  document.getElementById('toggle_c2').style.display = v ? 'none' : 'block';
+  document.querySelectorAll('.col-c2').forEach(el=>el.classList.toggle('hidden-col', !v));
+  if(!v){
+    ['c2_g1','c2_g2','c2_g3'].forEach(pfx=>{
+      document.getElementById(pfx+'_who').value = 'Aucun';
+      toggleExtraInput(pfx);
+    });
+  }
+  calcJournee();
+}
+document.getElementById('toggle_c2').addEventListener('click', ()=>setHas2(true));
+document.getElementById('remove_c2').addEventListener('click', ()=>setHas2(false));
+
+// ---- live calc for Journée page ----
+function calcJournee(){
+  const p1 = document.getElementById('c1_parcours').value;
+  const nb1 = clampNb(document.getElementById('c1_nb').value);
+  const prix1 = canyonPrice(p1,nb1), mat1 = canyonMat(p1,nb1), bat1 = canyonBat(p1,nb1);
+  const r1 = baseRate(p1,nb1), reco1 = nbGuidesReco(p1,nb1);
+
+  let p2=null, nb2=0, prix2=0, mat2=0, bat2=0, r2=0, reco2=0;
+  if(has2){
+    p2 = document.getElementById('c2_parcours').value;
+    nb2 = clampNb(document.getElementById('c2_nb').value);
+    prix2 = canyonPrice(p2,nb2); mat2 = canyonMat(p2,nb2); bat2 = canyonBat(p2,nb2);
+    r2 = baseRate(p2,nb2); reco2 = nbGuidesReco(p2,nb2);
+  }
+
+  const guidesList = buildGuidesMap(nb1, nb2, p1, p2, r1, r2);
+  let totalGuideSalary = 0;
+  ['c1_g1','c1_g2','c1_g3','c2_g1','c2_g2','c2_g3'].forEach(pfx=>{
+    const el = document.getElementById(pfx+'_sal');
+    el.textContent = '-';
+    el.classList.remove('neg');
+  });
+  guidesList.forEach(g=>{
+    totalGuideSalary += g.salaire;
+    g.slotIds.forEach(slotId=>{
+      const el = document.getElementById(slotId+'_sal');
+      el.textContent = fmt(g.salaire);
+      el.classList.toggle('neg', g.salaire<0);
+    });
+  });
+
+  const prixTotal = prix1+prix2, matTotal = mat1+mat2, batTotal = bat1+bat2;
+  const solde = prixTotal - matTotal - batTotal - totalGuideSalary;
+  const resultat = prixTotal - totalGuideSalary;
+
+  document.getElementById('r_prix').textContent = fmt(prixTotal);
+  document.getElementById('r_mat').textContent = fmt(matTotal);
+  document.getElementById('r_bat').textContent = fmt(batTotal);
+  document.getElementById('r_gtot').textContent = fmt(totalGuideSalary);
+  const soldeLine = document.getElementById('r_solde_line');
+  document.getElementById('r_solde').textContent = fmt(solde);
+  soldeLine.classList.toggle('neg', solde<0);
+  const resLine = document.getElementById('r_resultat_line');
+  document.getElementById('r_resultat').textContent = fmt(resultat);
+  resLine.classList.toggle('neg', resultat<0);
+
+  document.getElementById('reco1').textContent = reco1;
+  document.getElementById('reco2').textContent = reco2;
+}
+
+document.querySelectorAll('#pj input, #pj select').forEach(el=>{
+  el.addEventListener('input', calcJournee);
+});
+['day_principal','c1_g1','c1_g2','c1_g3','c2_g1','c2_g2','c2_g3'].forEach(pfx=>{
+  document.getElementById(pfx+'_who').addEventListener('input', ()=>{ toggleExtraInput(pfx); calcJournee(); });
+});
+
+// ---- save day into season ----
+function currentDayRecord(existingId){
+  const date = document.getElementById('j_date').value;
+  const p1 = document.getElementById('c1_parcours').value;
+  const nb1 = clampNb(document.getElementById('c1_nb').value);
+  const pay1 = document.getElementById('c1_paiement').value;
+  const canyons = [{n:1, moment:'Matin', parcours:p1, nb:nb1, paiement:pay1,
+    prix:canyonPrice(p1,nb1), mat:canyonMat(p1,nb1), bat:canyonBat(p1,nb1)}];
+  const r1 = baseRate(p1,nb1);
+  let r2 = 0, p2 = null, nb2 = 0;
+  if(has2){
+    p2 = document.getElementById('c2_parcours').value;
+    nb2 = clampNb(document.getElementById('c2_nb').value);
+    const pay2 = document.getElementById('c2_paiement').value;
+    canyons.push({n:2, moment:'Après-midi', parcours:p2, nb:nb2, paiement:pay2,
+      prix:canyonPrice(p2,nb2), mat:canyonMat(p2,nb2), bat:canyonBat(p2,nb2)});
+    r2 = baseRate(p2,nb2);
+  }
+  const guides = buildGuidesMap(nb1, nb2, p1, p2, r1, r2).map(g=>({
+    guideKey:g.guideKey, nom:g.nom, canyon1:g.canyon1, canyon2:g.canyon2,
+    salaire:g.salaire, estPrincipal:g.estPrincipal, nbClients:g.nbClients, parcours:g.parcours
+  }));
+  const prixTotal = canyons.reduce((s,c)=>s+c.prix,0);
+  const matTotal = canyons.reduce((s,c)=>s+c.mat,0);
+  const batTotal = canyons.reduce((s,c)=>s+c.bat,0);
+  const salaireTotal = guides.reduce((s,g)=>s+g.salaire,0);
+  const solde = prixTotal - matTotal - batTotal - salaireTotal;
+  const resultat = prixTotal - salaireTotal;
+  const id = existingId || (Date.now()+'_'+Math.random().toString(36).slice(2,7));
+  const remarque = document.getElementById('j_remarque').value.trim();
+  return {id, date, canyons, guides, synced:false, mode:'standard', remarque,
+    totals:{prix:prixTotal, mat:matTotal, bat:batTotal, salaireGuides:salaireTotal, solde, resultat}};
+}
+
+function resetJourneeForm(){
+  const iso = new Date().toISOString().slice(0,10);
+  document.getElementById('j_date').value = iso;
+  document.getElementById('c1_parcours').value = 'Initiation';
+  document.getElementById('c1_nb').value = 1;
+  document.getElementById('c1_paiement').value = 'Payé cash';
+  setHas2(false);
+  document.getElementById('c2_parcours').value = 'Découverte';
+  document.getElementById('c2_nb').value = 1;
+  document.getElementById('c2_paiement').value = 'Payé cash';
+  document.getElementById('day_principal_who').value = 'Antoine';
+  document.getElementById('day_principal_extra_nom').value = '';
+  toggleExtraInput('day_principal');
+  document.getElementById('c1_g1_who').value = 'Antoine';
+  document.getElementById('c1_g1_extra_nom').value = '';
+  toggleExtraInput('c1_g1');
+  ['c1_g2','c1_g3','c2_g1','c2_g2','c2_g3'].forEach(pfx=>{
+    document.getElementById(pfx+'_who').value = 'Aucun';
+    document.getElementById(pfx+'_extra_nom').value = '';
+    toggleExtraInput(pfx);
+  });
+  document.getElementById('m_nb').value = 1;
+  document.getElementById('m_montant').value = 0;
+  document.getElementById('m_paiement').value = 'Payé cash';
+  ['m_g1','m_g2','m_g3','m_g4'].forEach(pfx=>{
+    document.getElementById(pfx+'_who').value = 'Aucun';
+    document.getElementById(pfx+'_sal').value = 0;
+  });
+  document.getElementById('m_extra_nom').value = '';
+  document.getElementById('m_extra_sal').value = 0;
+  document.getElementById('j_remarque').value = '';
+  calcJournee();
+  calcManuel();
+}
+
+function loadManualDayForEdit(day){
+  const c1 = day.canyons[0];
+  document.getElementById('m_nb').value = c1.nb;
+  document.getElementById('m_montant').value = c1.prix;
+  document.getElementById('m_paiement').value = c1.paiement;
+  const slots = ['m_g1','m_g2','m_g3','m_g4'];
+  const nonExtra = day.guides.filter(g=>g.guideKey !== 'Extra');
+  const extra = day.guides.find(g=>g.guideKey === 'Extra');
+  slots.forEach((pfx,i)=>{
+    const g = nonExtra[i];
+    document.getElementById(pfx+'_who').value = g ? g.guideKey : 'Aucun';
+    document.getElementById(pfx+'_sal').value = g ? g.salaire : 0;
+  });
+  document.getElementById('m_extra_nom').value = extra && extra.nom !== 'Extra' ? extra.nom : '';
+  document.getElementById('m_extra_sal').value = extra ? extra.salaire : 0;
+  calcManuel();
+}
+
+function setEditMode(on){
+  editingId = on;
+  document.getElementById('edit_banner').style.display = on ? 'block' : 'none';
+  document.getElementById('save_day').textContent = on ? '✓ Mettre à jour cette journée' : '✓ Enregistrer cette journée dans la saison';
+}
+
+function startEditDay(day){
+  document.getElementById('j_date').value = day.date;
+  document.getElementById('j_remarque').value = day.remarque || '';
+  if(day.mode === 'manuel'){
+    setJourneeMode('manuel');
+    loadManualDayForEdit(day);
+    setEditMode(day.id);
+    document.querySelector('.tab-btn[data-tab="pj"]').click();
+    window.scrollTo(0,0);
+    return;
+  }
+  setJourneeMode('standard');
+  const c1 = day.canyons.find(c=>c.n===1);
+  document.getElementById('c1_parcours').value = c1.parcours;
+  document.getElementById('c1_nb').value = c1.nb;
+  document.getElementById('c1_paiement').value = c1.paiement;
+  const c2 = day.canyons.find(c=>c.n===2);
+  setHas2(!!c2);
+  if(c2){
+    document.getElementById('c2_parcours').value = c2.parcours;
+    document.getElementById('c2_nb').value = c2.nb;
+    document.getElementById('c2_paiement').value = c2.paiement;
+  }
+  const principal = day.guides.find(g=>g.estPrincipal);
+  document.getElementById('day_principal_who').value = principal ? principal.guideKey : 'Antoine';
+  document.getElementById('day_principal_extra_nom').value =
+    (principal && principal.guideKey === 'Extra' && principal.nom !== 'Extra') ? principal.nom : '';
+  toggleExtraInput('day_principal');
+
+  function fillCanyonSlots(prefix, guidesForCanyon){
+    ['g1','g2','g3'].forEach((slot,i)=>{
+      const pfx = prefix+'_'+slot;
+      const g = guidesForCanyon[i];
+      document.getElementById(pfx+'_who').value = g ? g.guideKey : 'Aucun';
+      document.getElementById(pfx+'_extra_nom').value = (g && g.guideKey === 'Extra' && g.nom !== 'Extra') ? g.nom : '';
+      toggleExtraInput(pfx);
+    });
+  }
+  fillCanyonSlots('c1', day.guides.filter(g=>g.canyon1));
+  fillCanyonSlots('c2', day.guides.filter(g=>g.canyon2));
+
+  calcJournee();
+  setEditMode(day.id);
+  document.querySelector('.tab-btn[data-tab="pj"]').click();
+  window.scrollTo(0,0);
+}
+
+document.getElementById('cancel_edit').addEventListener('click', ()=>{
+  setEditMode(null);
+  resetJourneeForm();
+  showToast('Modification annulée');
+});
+
+document.getElementById('save_day').addEventListener('click', ()=>{
+  const date = document.getElementById('j_date').value;
+  if(!date){ showToast('Choisis une date'); return; }
+  const wasEditing = !!editingId;
+  const rec = journeeMode === 'manuel' ? currentManualDayRecord(editingId) : currentDayRecord(editingId);
+  if(wasEditing){
+    season = season.filter(d=>d.id !== editingId);
+    season.push(rec);
+    saveSeason();
+    renderSeason();
+    showToast('Journée mise à jour');
+    setEditMode(null);
+  } else {
+    season.push(rec);
+    saveSeason();
+    renderSeason();
+    showToast('Journée enregistrée dans la saison');
+  }
+  resetJourneeForm();
+  syncDay(rec);
+});
+
+// ---- Sync (Google Sheet via Apps Script) ----
+async function syncDay(rec){
+  if(!syncUrl) return;
+  try{
+    const res = await fetch(syncUrl, {
+      method: 'POST',
+      headers: {'Content-Type': 'text/plain;charset=utf-8'},
+      body: JSON.stringify(rec)
+    });
+    const data = await res.json();
+    if(data && data.status === 'ok'){
+      const d = season.find(x=>x.id === rec.id);
+      if(d) d.synced = true;
+      saveSeason();
+      renderSeason();
+    } else {
+      showToast('Synchro refusée par le serveur');
+    }
+  }catch(err){
+    showToast('Sauvegardé localement — synchro impossible (hors ligne ?)');
+  }
+}
+
+async function syncAllUnsynced(){
+  if(!syncUrl){ showToast('Configure d\'abord une URL de synchronisation'); return; }
+  const todo = season.filter(d=>!d.synced);
+  if(todo.length === 0){ showToast('Tout est déjà synchronisé'); return; }
+  showToast('Synchronisation de ' + todo.length + ' journée(s)...');
+  let okCount = 0;
+  for(const d of todo){
+    try{
+      const res = await fetch(syncUrl, {
+        method: 'POST',
+        headers: {'Content-Type': 'text/plain;charset=utf-8'},
+        body: JSON.stringify(d)
+      });
+      const data = await res.json();
+      if(data && data.status === 'ok'){ d.synced = true; okCount++; }
+    }catch(err){ /* stop on network error, keep unsynced */ }
+  }
+  saveSeason();
+  renderSeason();
+  showToast(okCount + '/' + todo.length + ' journée(s) synchronisée(s)');
+}
+
+// Récupère toutes les journées déjà présentes sur le Google Sheet (envoyées par
+// n'importe quel guide) et les fusionne dans la saison locale de cet appareil.
+// Politique de fusion : une journée absente localement est ajoutée ; une journée
+// déjà présente ET déjà synchronisée est remplacée par la version du Sheet (au cas
+// où elle aurait été modifiée depuis un autre appareil) ; une journée locale pas
+// encore synchronisée (modification en cours sur CET appareil) n'est jamais écrasée.
+async function pullFromSheet(){
+  if(!syncUrl) return {ok:false};
+  try{
+    // ?data=1 : demande explicitement les données JSON. Sans ce paramètre, la même URL
+    // renvoie l'application elle-même (utile quand un humain l'ouvre dans son navigateur).
+    const dataUrl = syncUrl + (syncUrl.indexOf('?') > -1 ? '&' : '?') + 'data=1';
+    const res = await fetch(dataUrl, {method:'GET'});
+    const data = await res.json();
+    if(!data || data.status !== 'ok' || !Array.isArray(data.days)) return {ok:false};
+    let added = 0, updated = 0;
+    data.days.forEach(remoteDay=>{
+      const idx = season.findIndex(d=>d.id === remoteDay.id);
+      if(idx === -1){
+        remoteDay.synced = true;
+        season.push(remoteDay);
+        added++;
+      } else if(season[idx].synced){
+        remoteDay.synced = true;
+        season[idx] = remoteDay;
+        updated++;
+      }
+    });
+    if(added > 0 || updated > 0){ saveSeason(); renderSeason(); }
+    return {ok:true, added, updated};
+  }catch(err){
+    return {ok:false};
+  }
+}
+
+async function syncNow(){
+  await syncAllUnsynced();
+  const r = await pullFromSheet();
+  if(r.ok && (r.added > 0 || r.updated > 0)){
+    showToast(`Sheet : ${r.added} journée(s) reçue(s), ${r.updated} mise(s) à jour`);
+  } else if(r.ok){
+    showToast('Tout est à jour avec le Sheet');
+  }
+}
+
+document.getElementById('save_sync_url').addEventListener('click', ()=>{
+  const val = document.getElementById('sync_url').value.trim();
+  syncUrl = val;
+  saveSyncUrl(val);
+  showToast(val ? 'URL de synchronisation enregistrée' : 'Synchronisation désactivée');
+  renderSeason();
+});
+document.getElementById('sync_now').addEventListener('click', syncNow);
+document.getElementById('toggle_sync_advanced').addEventListener('click', (e)=>{
+  e.preventDefault();
+  const box = document.getElementById('sync_advanced');
+  const isHidden = box.style.display === 'none';
+  box.style.display = isHidden ? 'block' : 'none';
+  document.getElementById('toggle_sync_advanced').textContent = isHidden ? 'Masquer les paramètres avancés' : 'Paramètres avancés';
+});
+document.getElementById('reset_sync_url').addEventListener('click', ()=>{
+  syncUrl = DEFAULT_SYNC_URL;
+  saveSyncUrl(DEFAULT_SYNC_URL);
+  showToast('URL par défaut restaurée');
+  renderSeason();
+});
+
+// ---- Season page rendering ----
+function renderSeason(){
+  document.getElementById('sync_url').value = syncUrl;
+  const unsyncedCount = season.filter(d=>!d.synced).length;
+  const statusEl = document.getElementById('sync_status');
+  if(!syncUrl){
+    statusEl.textContent = 'Pas encore configuré — chaque journée reste seulement sur ce téléphone.';
+  } else if(unsyncedCount === 0){
+    statusEl.textContent = 'Toutes les journées sont synchronisées ✓';
+  } else {
+    statusEl.textContent = unsyncedCount + ' journée(s) pas encore synchronisée(s) — touche "Synchroniser maintenant".';
+  }
+
+  const totalClients = season.reduce((s,d)=>s+d.canyons.reduce((a,c)=>a+c.nb,0),0);
+  const totalCash = season.reduce((s,d)=>s+d.canyons.filter(c=>c.paiement==='Payé cash').reduce((a,c)=>a+c.prix,0),0);
+  const totalFacturer = season.reduce((s,d)=>s+d.canyons.filter(c=>c.paiement==='À facturer').reduce((a,c)=>a+c.prix,0),0);
+  const totalGuideSal = season.reduce((s,d)=>s+d.totals.salaireGuides,0);
+  const totalResultat = season.reduce((s,d)=>s+d.totals.resultat,0);
+
+  document.getElementById('s_days').textContent = season.length;
+  document.getElementById('s_clients').textContent = totalClients;
+  document.getElementById('s_cash').textContent = fmt(totalCash);
+  document.getElementById('s_facturer').textContent = fmt(totalFacturer);
+  document.getElementById('s_guides').textContent = fmt(totalGuideSal);
+  document.getElementById('s_resultat').textContent = fmt(totalResultat);
+
+  // comptabilité par guide (4 guides fixes + Extra), toujours affichée même à 0.-
+  const perGuide = {};
+  GUIDE_ROSTER.forEach(n=>perGuide[n] = {jours:0, total:0});
+  season.forEach(d=>d.guides.forEach(g=>{
+    if(!perGuide[g.guideKey]) perGuide[g.guideKey] = {jours:0, total:0};
+    perGuide[g.guideKey].jours += 1;
+    perGuide[g.guideKey].total += g.salaire;
+  }));
+  const tbody = document.getElementById('guide_summary_body');
+  let rowsHtml = GUIDE_ROSTER.map(n=>`<tr><td>${n}</td><td>${perGuide[n].jours}</td><td class="num">${fmt(perGuide[n].total)}</td></tr>`).join('');
+  rowsHtml += `<tr style="background:var(--vert-clair);font-weight:700;"><td>Esprit Liberté</td><td>${season.length}</td><td class="num">${fmt(totalResultat)}</td></tr>`;
+  tbody.innerHTML = rowsHtml;
+
+  renderGuideDetail();
+
+  // days list
+  const list = document.getElementById('days_list');
+  if(season.length === 0){
+    list.innerHTML = '<div class="empty-msg">Aucune journée enregistrée pour l\'instant.</div>';
+    return;
+  }
+  const sorted = [...season].sort((a,b)=> a.date < b.date ? 1 : a.date > b.date ? -1 : 0);
+  list.innerHTML = sorted.map(d=>{
+    const canyonsHtml = d.canyons.map(c=>`${c.moment} : ${c.parcours} (${c.nb} pers., ${c.paiement}) — ${fmt(c.prix)}`).join('<br>');
+    const guidesHtml = d.guides.length
+      ? d.guides.map(g=>`${g.nom} : ${fmt(g.salaire)}`).join(' · ')
+      : 'aucun guide saisi';
+    const resClass = d.totals.resultat < 0 ? 'neg' : 'pos';
+    const syncBadge = !syncUrl ? '' : (d.synced
+      ? '<span class="badge" style="background:var(--vert-clair);color:var(--vert);">✓ synchro</span>'
+      : '<span class="badge warn">en attente</span>');
+    return `<div class="day-entry">
+      <div class="dhead"><span class="ddate">${fmtDateFR(d.date)} ${syncBadge}</span>
+        <span>
+          <button class="del-day-btn" data-editid="${d.id}" style="color:var(--bleu-fonce);font-size:13px;">Modifier</button>
+          <button class="del-day-btn" data-id="${d.id}">×</button>
+        </span>
+      </div>
+      <div class="dcanyon">${canyonsHtml}</div>
+      <div class="dguides">Guides : ${guidesHtml}</div>
+      <div class="dresultat ${resClass}">Résultat esprit-liberté : ${fmt(d.totals.resultat)}</div>
+      ${d.remarque ? `<div class="dremarque" style="margin-top:4px;font-size:13px;color:var(--gris);font-style:italic;">📝 ${d.remarque}</div>` : ''}
+    </div>`;
+  }).join('');
+
+  list.querySelectorAll('[data-id]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      if(!confirm('Supprimer cette journée ?')) return;
+      season = season.filter(d=>d.id !== btn.dataset.id);
+      saveSeason();
+      renderSeason();
+    });
+  });
+  list.querySelectorAll('[data-editid]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const day = season.find(d=>d.id === btn.dataset.editid);
+      if(day) startEditDay(day);
+    });
+  });
+}
+
+function renderGuideDetail(){
+  const who = document.getElementById('detail_guide_select').value;
+  const rows = [];
+  [...season].sort((a,b)=>a.date<b.date?-1:1).forEach(d=>{
+    const g = d.guides.find(x=>x.guideKey === who);
+    if(!g) return;
+    rows.push({
+      date: fmtDateFR(d.date),
+      parcours: g.parcours,
+      nbClients: g.nbClients,
+      salaire: g.salaire,
+      solde: g.estPrincipal ? d.totals.resultat : null
+    });
+  });
+  const tbody = document.getElementById('detail_guide_body');
+  const emptyMsg = document.getElementById('detail_guide_empty');
+  if(rows.length === 0){
+    tbody.innerHTML = '';
+    emptyMsg.style.display = 'block';
+    return;
+  }
+  emptyMsg.style.display = 'none';
+  tbody.innerHTML = rows.map(r=>{
+    const soldeCell = r.solde === null ? '<span style="color:var(--gris);">-</span>' :
+      `<span class="${r.solde<0?'':''}" style="color:${r.solde<0?'var(--rouge)':'var(--vert)'};font-weight:700;">${fmt(r.solde)}</span>`;
+    return `<tr><td>${r.date}</td><td>${r.parcours}</td><td>${r.nbClients}</td><td class="num">${fmt(r.salaire)}</td><td style="text-align:right;">${soldeCell}</td></tr>`;
+  }).join('');
+}
+document.getElementById('detail_guide_select').addEventListener('input', renderGuideDetail);
+
+document.getElementById('clear_season').addEventListener('click', ()=>{
+  if(season.length === 0) return;
+  if(confirm('Vider toute la saison ? Pense à faire une sauvegarde .json avant si besoin.')){
+    season = [];
+    saveSeason();
+    renderSeason();
+    showToast('Saison vidée');
+  }
+});
+
+// ---- export helpers ----
+function downloadBlob(blob, filename){
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  setTimeout(()=>{ document.body.removeChild(a); URL.revokeObjectURL(url); }, 500);
+}
+
+function buildJournalRows(){
+  const rows = [];
+  [...season].sort((a,b)=>a.date<b.date?-1:1).forEach(d=>{
+    d.canyons.forEach(c=>{
+      rows.push({'Date':fmtDateFR(d.date), 'Canyon':c.moment, 'Parcours':c.parcours, 'Nb clients':c.nb,
+        'Paiement':c.paiement, 'Prix (.-)':c.prix, 'Remarque':d.remarque || ''});
+    });
+  });
+  return rows;
+}
+function buildGuideRows(){
+  const rows = [];
+  [...season].sort((a,b)=>a.date<b.date?-1:1).forEach(d=>{
+    d.guides.forEach(g=>{
+      const canyonsFaits = [g.canyon1?'Canyon 1':null, g.canyon2?'Canyon 2':null].filter(Boolean).join(' + ');
+      rows.push({'Date':fmtDateFR(d.date), 'Guide':g.nom, 'Parcours':g.parcours, 'Nb clients':g.nbClients,
+        'Canyon(s)':canyonsFaits, 'Salaire (.-)':g.salaire,
+        'Solde à verser (.-)': g.estPrincipal ? d.totals.resultat : ''});
+    });
+  });
+  return rows;
+}
+function buildResumeJourRows(){
+  return [...season].sort((a,b)=>a.date<b.date?-1:1).map(d=>({
+    'Date':fmtDateFR(d.date), 'Prix total (.-)':d.totals.prix, 'Matériel (.-)':d.totals.mat,
+    'Bâtiment (.-)':d.totals.bat, 'Salaire guides (.-)':d.totals.salaireGuides,
+    'Solde (.-)':d.totals.solde, 'Résultat esprit-liberté (.-)':d.totals.resultat, 'Remarque':d.remarque || ''
+  }));
+}
+function buildResumeGuideRows(){
+  const perGuide = {};
+  GUIDE_ROSTER.forEach(n=>perGuide[n] = {jours:0, total:0});
+  season.forEach(d=>d.guides.forEach(g=>{
+    if(!perGuide[g.guideKey]) perGuide[g.guideKey] = {jours:0, total:0};
+    perGuide[g.guideKey].jours += 1; perGuide[g.guideKey].total += g.salaire;
+  }));
+  const totalResultatSeason = season.reduce((s,d)=>s+d.totals.resultat,0);
+  const rows = GUIDE_ROSTER.map(n=>({'Compte':n, 'Jours':perGuide[n].jours, 'Total (.-)':perGuide[n].total}));
+  rows.push({'Compte':'Esprit Liberté', 'Jours':season.length, 'Total (.-)':totalResultatSeason});
+  return rows;
+}
+
+document.getElementById('export_xlsx').addEventListener('click', ()=>{
+  if(season.length === 0){ showToast('Saison vide'); return; }
+  if(typeof XLSX === 'undefined'){ showToast('Pas de connexion — utilise l\'export CSV'); return; }
+  const wb = XLSX.utils.book_new();
+  const ws1 = XLSX.utils.json_to_sheet(buildJournalRows());
+  const ws2 = XLSX.utils.json_to_sheet(buildGuideRows());
+  const ws3 = XLSX.utils.json_to_sheet(buildResumeJourRows());
+  const ws4 = XLSX.utils.json_to_sheet(buildResumeGuideRows());
+  XLSX.utils.book_append_sheet(wb, ws1, 'Journal');
+  XLSX.utils.book_append_sheet(wb, ws2, 'Guides');
+  XLSX.utils.book_append_sheet(wb, ws3, 'Résumé jours');
+  XLSX.utils.book_append_sheet(wb, ws4, 'Comptabilités');
+  XLSX.writeFile(wb, 'saison_canyoning_' + new Date().toISOString().slice(0,10) + '.xlsx');
+  showToast('Export Excel téléchargé');
+});
+
+document.getElementById('export_csv').addEventListener('click', ()=>{
+  if(season.length === 0){ showToast('Saison vide'); return; }
+  const rows = [];
+  [...season].sort((a,b)=>a.date<b.date?-1:1).forEach(d=>{
+    const guidesTxt = d.guides.map(g=>`${g.nom} (${g.salaire})`).join(' / ');
+    d.canyons.forEach(c=>{
+      rows.push({'Date':fmtDateFR(d.date), 'Canyon':c.moment, 'Parcours':c.parcours, 'Nb clients':c.nb,
+        'Paiement':c.paiement, 'Prix':c.prix, 'Guides (nom/salaire)':guidesTxt, 'Resultat esprit-liberte':d.totals.resultat, 'Remarque':d.remarque || ''});
+    });
+  });
+  const headers = Object.keys(rows[0]);
+  let csv = headers.join(';') + '\n';
+  rows.forEach(r=>{ csv += headers.map(h=>('"'+String(r[h]).replace(/"/g,'""')+'"')).join(';') + '\n'; });
+  const blob = new Blob(['﻿'+csv], {type:'text/csv;charset=utf-8;'});
+  downloadBlob(blob, 'saison_canyoning_' + new Date().toISOString().slice(0,10) + '.csv');
+  showToast('Export CSV téléchargé');
+});
+
+document.getElementById('backup_json').addEventListener('click', ()=>{
+  if(season.length === 0){ showToast('Saison vide'); return; }
+  const blob = new Blob([JSON.stringify(season, null, 2)], {type:'application/json'});
+  downloadBlob(blob, 'sauvegarde_canyoning_' + new Date().toISOString().slice(0,10) + '.json');
+  showToast('Sauvegarde téléchargée');
+});
+
+document.getElementById('restore_btn').addEventListener('click', ()=>{
+  document.getElementById('restore-file').click();
+});
+document.getElementById('restore-file').addEventListener('change', (ev)=>{
+  const file = ev.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = (e)=>{
+    try{
+      const data = JSON.parse(e.target.result);
+      if(!Array.isArray(data)) throw new Error('format invalide');
+      if(season.length > 0 && !confirm(data.length + ' journée(s) trouvée(s). Remplacer la saison actuelle (' + season.length + ' jours) ?')) return;
+      season = data;
+      saveSeason();
+      renderSeason();
+      showToast('Sauvegarde restaurée');
+    }catch(err){
+      showToast('Fichier de sauvegarde non reconnu');
+    }
+    document.getElementById('restore-file').value = '';
+  };
+  reader.readAsText(file, 'UTF-8');
+});
+
+// ---- tabs ----
+document.querySelectorAll('.tab-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(btn.dataset.tab).classList.add('active');
+    if(btn.dataset.tab === 'ps') renderSeason();
+  });
+});
+
+// ---- init ----
+(function(){
+  const iso = new Date().toISOString().slice(0,10);
+  document.getElementById('j_date').value = iso;
+  setHas2(false);
+  setJourneeMode('standard');
+  calcJournee();
+  calcManuel();
+  renderSeason();
+  if(syncUrl) pullFromSheet();
+})();
+</script>
+</body>
+</html>
