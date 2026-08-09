@@ -845,12 +845,12 @@ function updateTzSuppField(pfx, partner, parcours){
   }
   const nb = clampNb2(input.value);
   const prix = nb * TZ_SUPP_PRIX;
-  // Même logique que les tables de base : matériel/bâtiment sont déduits pour ces personnes
-  // aussi (c'est une vraie descente Découverte), avant de savoir ce qui revient à Esprit Liberté.
-  // canyonMat/canyonBat clampent à 1 personne minimum : on ne les appelle donc que si nb>0,
-  // sinon un supplément à 0 personne facturerait quand même le matériel/bâtiment d'1 personne.
-  const mat = nb > 0 ? canyonMat('Découverte', nb) : 0, bat = nb > 0 ? canyonBat('Découverte', nb) : 0;
-  note.textContent = nb > 0 ? `= ${fmt(prix)} en cash, versé directement au guide (ne s'ajoute pas à la facture office). Matériel/bâtiment déduits normalement (${fmt(mat+bat)}.-) avant la part Esprit Liberté.` : '';
+  // Le matériel/bâtiment de ces personnes est déjà compté une fois dans le canyon Initiation
+  // (mat1/bat1 couvrent TOUS les participants du canyon, y compris ceux qui continuent) : ils
+  // utilisent le même matériel pour la même sortie, pas un 2e équipement. Le facturer une 2e
+  // fois ici serait un double comptage. Le supplément n'ajoute donc pas de matériel/bâtiment.
+  const mat = 0, bat = 0;
+  note.textContent = nb > 0 ? `= ${fmt(prix)} en cash, versé directement au guide (ne s'ajoute pas à la facture office). Matériel/bâtiment déjà compté via le canyon Initiation, pas facturé une 2e fois.` : '';
   return {nb, prix, mat, bat};
 }
 
@@ -858,7 +858,7 @@ function updateTzSuppField(pfx, partner, parcours){
 function readTzSupp(pfx, partner, parcours){
   if(!isTzSuppApplicable(partner, parcours)) return {nb: 0, prix: 0, mat: 0, bat: 0};
   const nb = clampNb2(document.getElementById(pfx+'_tz_supp_nb').value);
-  return {nb, prix: nb * TZ_SUPP_PRIX, mat: nb > 0 ? canyonMat('Découverte', nb) : 0, bat: nb > 0 ? canyonBat('Découverte', nb) : 0};
+  return {nb, prix: nb * TZ_SUPP_PRIX, mat: 0, bat: 0};
 }
 
 // Au changement de partenaire : force le parcours dans la liste autorisée par ce partenaire
