@@ -835,19 +835,22 @@ function updateTzSuppField(pfx, partner, parcours){
   field.style.display = applicable ? 'block' : 'none';
   if(!applicable){
     input.value = 0;
-    return {nb: 0, prix: 0};
+    return {nb: 0, prix: 0, mat: 0, bat: 0};
   }
   const nb = clampNb2(input.value);
   const prix = nb * TZ_SUPP_PRIX;
-  note.textContent = nb > 0 ? `= ${fmt(prix)} en cash, versé directement au guide (ne s'ajoute pas à la facture office).` : '';
-  return {nb, prix};
+  // Même logique que les tables de base : matériel/bâtiment sont déduits pour ces personnes
+  // aussi (c'est une vraie descente Découverte), avant de savoir ce qui revient à Esprit Liberté.
+  const mat = canyonMat('Découverte', nb), bat = canyonBat('Découverte', nb);
+  note.textContent = nb > 0 ? `= ${fmt(prix)} en cash, versé directement au guide (ne s'ajoute pas à la facture office). Matériel/bâtiment déduits normalement (${fmt(mat+bat)}.-) avant la part Esprit Liberté.` : '';
+  return {nb, prix, mat, bat};
 }
 
 // Version "lecture seule" (sans toucher à l'affichage), utilisée lors de l'enregistrement.
 function readTzSupp(pfx, partner, parcours){
-  if(!isTzSuppApplicable(partner, parcours)) return {nb: 0, prix: 0};
+  if(!isTzSuppApplicable(partner, parcours)) return {nb: 0, prix: 0, mat: 0, bat: 0};
   const nb = clampNb2(document.getElementById(pfx+'_tz_supp_nb').value);
-  return {nb, prix: nb * TZ_SUPP_PRIX};
+  return {nb, prix: nb * TZ_SUPP_PRIX, mat: canyonMat('Découverte', nb), bat: canyonBat('Découverte', nb)};
 }
 
 // Au changement de partenaire : force le parcours dans la liste autorisée par ce partenaire
@@ -1045,7 +1048,7 @@ function calcJournee(){
   updatePartnerNote('c1', partner1, p1, pricing1);
   const tzSupp1 = updateTzSuppField('c1', partner1, p1);
 
-  let p2=null, nb2=0, prix2=0, mat2=0, bat2=0, r2=0, reco2=0, pricing2={commission:0}, tzSupp2={nb:0,prix:0};
+  let p2=null, nb2=0, prix2=0, mat2=0, bat2=0, r2=0, reco2=0, pricing2={commission:0}, tzSupp2={nb:0,prix:0,mat:0,bat:0};
   if(has2){
     p2 = document.getElementById('c2_parcours').value;
     nb2 = clampNb(document.getElementById('c2_nb').value);
@@ -1078,7 +1081,7 @@ function calcJournee(){
   });
 
   const tzSuppTotal = tzSupp1.prix + tzSupp2.prix;
-  const prixTotal = prix1+prix2+tzSuppTotal, matTotal = mat1+mat2, batTotal = bat1+bat2;
+  const prixTotal = prix1+prix2+tzSuppTotal, matTotal = mat1+mat2+tzSupp1.mat+tzSupp2.mat, batTotal = bat1+bat2+tzSupp1.bat+tzSupp2.bat;
   const commissionsTotal = (pricing1.commission||0) + (pricing2.commission||0);
   const solde = prixTotal - matTotal - batTotal - totalGuideSalary - commissionsTotal;
   const resultat = prixTotal - totalGuideSalary - commissionsTotal;
@@ -1131,9 +1134,9 @@ function currentDayRecord(existingId){
     partenaire: partner1 !== 'Aucun' ? partner1 : null,
     commission: pricing1.commission || 0, commissionLabel: pricing1.commissionLabel || null,
     factureStatus: pay1 === 'À facturer' ? (oldStatus(1) || 'à facturer') : null,
-    tzSuppNb: tzSupp1.nb, tzSuppPrix: tzSupp1.prix}];
+    tzSuppNb: tzSupp1.nb, tzSuppPrix: tzSupp1.prix, tzSuppMat: tzSupp1.mat, tzSuppBat: tzSupp1.bat}];
   const r1 = baseRate(p1,nb1);
-  let r2 = 0, p2 = null, nb2 = 0, tzSupp2 = {nb:0, prix:0};
+  let r2 = 0, p2 = null, nb2 = 0, tzSupp2 = {nb:0, prix:0, mat:0, bat:0};
   if(has2){
     p2 = document.getElementById('c2_parcours').value;
     nb2 = clampNb(document.getElementById('c2_nb').value);
@@ -1146,7 +1149,7 @@ function currentDayRecord(existingId){
       partenaire: partner2 !== 'Aucun' ? partner2 : null,
       commission: pricing2.commission || 0, commissionLabel: pricing2.commissionLabel || null,
       factureStatus: pay2 === 'À facturer' ? (oldStatus(2) || 'à facturer') : null,
-      tzSuppNb: tzSupp2.nb, tzSuppPrix: tzSupp2.prix});
+      tzSuppNb: tzSupp2.nb, tzSuppPrix: tzSupp2.prix, tzSuppMat: tzSupp2.mat, tzSuppBat: tzSupp2.bat});
     r2 = baseRate(p2,nb2);
   }
   const r1eff = effectiveRateWithTzSupp(r1, tzSupp1.nb);
@@ -1156,8 +1159,8 @@ function currentDayRecord(existingId){
     salaire:g.salaire, estPrincipal:g.estPrincipal, nbClients:g.nbClients, parcours:g.parcours
   }));
   const prixTotal = canyons.reduce((s,c)=>s+c.prix,0) + tzSupp1.prix + tzSupp2.prix;
-  const matTotal = canyons.reduce((s,c)=>s+c.mat,0);
-  const batTotal = canyons.reduce((s,c)=>s+c.bat,0);
+  const matTotal = canyons.reduce((s,c)=>s+c.mat,0) + tzSupp1.mat + tzSupp2.mat;
+  const batTotal = canyons.reduce((s,c)=>s+c.bat,0) + tzSupp1.bat + tzSupp2.bat;
   const salaireTotal = guides.reduce((s,g)=>s+g.salaire,0);
   const commissionsTotal = canyons.reduce((s,c)=>s+(c.commission||0),0);
   const solde = prixTotal - matTotal - batTotal - salaireTotal - commissionsTotal;
