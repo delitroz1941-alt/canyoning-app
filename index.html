@@ -1023,6 +1023,17 @@ function loadSeason(){
 function saveSeason(){ try{ localStorage.setItem(STORAGE_SEASON, JSON.stringify(season)); }catch(e){} }
 let season = loadSeason();
 
+// Journées supprimées localement mais dont la suppression n'a pas encore été confirmée par
+// le serveur (ou pas de connexion au moment du clic) : tant qu'un ID reste dans cette liste,
+// pullFromSheet() refuse de le re-télécharger, sinon une journée déjà synchronisée sur le
+// Sheet réapparaîtrait toute seule à la prochaine ouverture de l'app.
+const STORAGE_DELETED = 'canyoning_deleted_ids_v1';
+function loadDeletedIds(){
+  try{ const raw = localStorage.getItem(STORAGE_DELETED); return raw? JSON.parse(raw) : []; }catch(e){ return []; }
+}
+function saveDeletedIds(){ try{ localStorage.setItem(STORAGE_DELETED, JSON.stringify(deletedIds)); }catch(e){} }
+let deletedIds = loadDeletedIds();
+
 const STORAGE_SYNC_URL = 'canyoning_sync_url_v1';
 const DEFAULT_SYNC_URL = 'https://script.google.com/macros/s/AKfycbxkKKpvxbyJFO3eHYINAI8VfQ-13OILbE3X8g2u-r0yHLeJLn8ITZvWmmwo3H-ICXQTRA/exec';
 function loadSyncUrl(){ try{ return localStorage.getItem(STORAGE_SYNC_URL) || DEFAULT_SYNC_URL; }catch(e){ return DEFAULT_SYNC_URL; } }
@@ -1401,6 +1412,9 @@ async function pullFromSheet(){
     if(!data || data.status !== 'ok' || !Array.isArray(data.days)) return {ok:false};
     let added = 0, updated = 0;
     data.days.forEach(remoteDay=>{
+      // Une journée en attente de suppression (ou déjà supprimée mais que le Sheet n'a pas
+      // encore digéré) ne doit jamais être re-téléchargée, sinon elle réapparaît toute seule.
+      if(deletedIds.includes(remoteDay.id)) return;
       const idx = season.findIndex(d=>d.id === remoteDay.id);
       if(idx === -1){
         remoteDay.synced = true;
@@ -1419,7 +1433,29 @@ async function pullFromSheet(){
   }
 }
 
+// Demande au serveur de supprimer une journée (toutes ses lignes dans Journal/Guides/Data).
+// Tant que ça n'a pas réussi, l'ID reste "tombstoné" localement (voir pullFromSheet) pour
+// qu'il ne revienne pas se réafficher tout seul depuis le Sheet.
+async function deleteOnServer(id){
+  if(!syncUrl) return false;
+  try{
+    const res = await fetch(syncUrl, {method:'POST', body: JSON.stringify({action:'delete', id})});
+    const data = await res.json();
+    if(data && data.status === 'ok'){
+      deletedIds = deletedIds.filter(x=>x!==id);
+      saveDeletedIds();
+      return true;
+    }
+  }catch(err){ /* pas de réseau : on retentera au prochain syncNow()/chargement */ }
+  return false;
+}
+async function flushDeletedIds(){
+  if(!syncUrl || deletedIds.length === 0) return;
+  for(const id of [...deletedIds]){ await deleteOnServer(id); }
+}
+
 async function syncNow(){
+  await flushDeletedIds();
   await syncAllUnsynced();
   const r = await pullFromSheet();
   if(r.ok && (r.added > 0 || r.updated > 0)){
@@ -1533,9 +1569,14 @@ function renderSeason(){
   list.querySelectorAll('[data-id]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       if(!confirm('Supprimer cette journée ?')) return;
-      season = season.filter(d=>d.id !== btn.dataset.id);
+      const id = btn.dataset.id;
+      season = season.filter(d=>d.id !== id);
+      if(!deletedIds.includes(id)){ deletedIds.push(id); saveDeletedIds(); }
       saveSeason();
       renderSeason();
+      // Pousse la suppression au Sheet en tâche de fond ; tant que ça n'aboutit pas, le
+      // tombstone local empêche la journée de revenir au prochain sync/chargement.
+      deleteOnServer(id);
     });
   });
   list.querySelectorAll('[data-editid]').forEach(btn=>{
@@ -1842,7 +1883,7 @@ document.querySelectorAll('.tab-btn').forEach(btn=>{
   calcManuel();
   renderSeason();
   renderFactures();
-  if(syncUrl) pullFromSheet();
+  if(syncUrl){ flushDeletedIds().then(pullFromSheet); }
 })();
 </script>
 </body>
