@@ -727,6 +727,15 @@ function nbGuidesReco(parcours, nb){
   const g = guideRates(parcours,nb);
   return (g[0]>0?1:0)+(g[1]>0?1:0)+(g[2]>0?1:0);
 }
+// Quand un supplément Tzoumaz est actif, le sous-groupe qui continue évolue en terrain
+// Découverte, dont le barème demande plus vite un 2e/3e guide (dès 9 pers.) que celui
+// d'Initiation (dès 11 pers.). La reco doit donc couvrir le PLUS exigeant des deux besoins :
+// le groupe complet en terrain Initiation, ET le sous-groupe continuant en terrain Découverte.
+function nbGuidesRecoWithTzSupp(parcours, nb, tzSuppNb){
+  const base = nbGuidesReco(parcours, nb);
+  if(!tzSuppNb) return base;
+  return Math.max(base, nbGuidesReco('Découverte', tzSuppNb));
+}
 function comboSalary(r1, r2){
   const total = r1+r2;
   const red = total > 650 ? total*0.8 : total;
@@ -907,8 +916,7 @@ function getSlotList(canyonPrefix){
 // pour tout le monde. C'est ce qui fait que les tabelles (ex. Initiation 4 pers = [300,0,0])
 // ne payaient jusqu'ici QUE 300.- au 1er guide en théorie, mais un 2e guide ajouté sur le même
 // canyon touchait aussi 300.- au lieu de 0.- (puisque la case 2e guide de la table est vide).
-function guideRateForSlot(parcours, nb, slotIndex, tzSuppNb){
-  if(slotIndex === 0 && tzSuppNb) return effectiveRateWithTzSupp(parcours, nb, tzSuppNb);
+function guideRateForSlot(parcours, nb, slotIndex){
   const rates = guideRates(parcours, nb);
   return rates[slotIndex] || 0;
 }
@@ -927,8 +935,10 @@ function buildGuidesMap(nb1, nb2, p1, p2, tzSupp1Nb, tzSupp2Nb){
     map[key][idxKey] = idx;
     map[key].slotIds.push(s.slotId);
   };
-  getSlotList('c1').forEach((s,idx)=>addSlot(s,'canyon1','idx1',idx));
-  if(has2) getSlotList('c2').forEach((s,idx)=>addSlot(s,'canyon2','idx2',idx));
+  const slots1 = getSlotList('c1');
+  slots1.forEach((s,idx)=>addSlot(s,'canyon1','idx1',idx));
+  const slots2 = has2 ? getSlotList('c2') : [];
+  slots2.forEach((s,idx)=>addSlot(s,'canyon2','idx2',idx));
 
   const principalWho = document.getElementById('day_principal_who').value;
   const principalNom = principalWho === 'Extra'
@@ -937,10 +947,20 @@ function buildGuidesMap(nb1, nb2, p1, p2, tzSupp1Nb, tzSupp2Nb){
   const principalKey = principalWho + (principalWho === 'Extra' ? '::'+principalNom : '');
   if(!map[principalKey]) map[principalKey] = {guideKey: principalWho, nom: principalNom, canyon1:false, canyon2:false, idx1:null, idx2:null, slotIds:[]};
 
+  // Quand un supplément Tzoumaz est actif sur un canyon, la table ne prévoit pas de colonne
+  // "supplément" par place de guide (1er/2e/3e) : elle ne couvre que le parcours simple. S'il y
+  // a plusieurs guides sur ce canyon, le salaire combiné (restants + continuants, cf.
+  // effectiveRateWithTzSupp) est donc réparti à parts égales entre eux, plutôt que d'appliquer à
+  // chacun un tarif de place qui ne correspond à rien dans ce cas de figure.
+  const n1 = slots1.filter(s=>s.who!=='Aucun').length;
+  const n2 = slots2.filter(s=>s.who!=='Aucun').length;
+  const totalTz1 = tzSupp1Nb ? effectiveRateWithTzSupp(p1, nb1, tzSupp1Nb) : null;
+  const totalTz2 = tzSupp2Nb ? effectiveRateWithTzSupp(p2, nb2, tzSupp2Nb) : null;
+
   return Object.keys(map).map(key=>{
     const g = map[key];
-    const rate1 = g.canyon1 ? guideRateForSlot(p1, nb1, g.idx1, tzSupp1Nb) : 0;
-    const rate2 = g.canyon2 ? guideRateForSlot(p2, nb2, g.idx2, tzSupp2Nb) : 0;
+    const rate1 = g.canyon1 ? (totalTz1 !== null ? totalTz1 / Math.max(n1,1) : guideRateForSlot(p1, nb1, g.idx1)) : 0;
+    const rate2 = g.canyon2 ? (totalTz2 !== null ? totalTz2 / Math.max(n2,1) : guideRateForSlot(p2, nb2, g.idx2)) : 0;
     const salaire = guideSalary(g.canyon1, g.canyon2, rate1, rate2);
     const nbClients = (g.canyon1?nb1:0) + (g.canyon2?nb2:0);
     const parcoursLabel = [g.canyon1?p1:null, g.canyon2?p2:null].filter(Boolean).join(' + ');
@@ -1076,9 +1096,9 @@ function calcJournee(){
   const partner1 = document.getElementById('c1_partenaire').value;
   const pricing1 = partnerPricing(partner1, p1, nb1);
   const prix1 = pricing1.prix, mat1 = canyonMat(p1,nb1), bat1 = canyonBat(p1,nb1);
-  const r1 = baseRate(p1,nb1), reco1 = nbGuidesReco(p1,nb1);
   updatePartnerNote('c1', partner1, p1, pricing1);
   const tzSupp1 = updateTzSuppField('c1', partner1, p1);
+  const r1 = baseRate(p1,nb1), reco1 = nbGuidesRecoWithTzSupp(p1,nb1,tzSupp1.nb);
 
   let p2=null, nb2=0, prix2=0, mat2=0, bat2=0, r2=0, reco2=0, pricing2={commission:0}, tzSupp2={nb:0,prix:0,mat:0,bat:0};
   if(has2){
@@ -1087,9 +1107,9 @@ function calcJournee(){
     const partner2 = document.getElementById('c2_partenaire').value;
     pricing2 = partnerPricing(partner2, p2, nb2);
     prix2 = pricing2.prix; mat2 = canyonMat(p2,nb2); bat2 = canyonBat(p2,nb2);
-    r2 = baseRate(p2,nb2); reco2 = nbGuidesReco(p2,nb2);
     updatePartnerNote('c2', partner2, p2, pricing2);
     tzSupp2 = updateTzSuppField('c2', partner2, p2);
+    r2 = baseRate(p2,nb2); reco2 = nbGuidesRecoWithTzSupp(p2,nb2,tzSupp2.nb);
   } else {
     updateTzSuppField('c2', 'Aucun', null);
   }
