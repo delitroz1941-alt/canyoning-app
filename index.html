@@ -211,6 +211,20 @@
     margin-left:6px;
   }
   .badge.warn{background:#FDECEA;color:#B02A1E;}
+  .facture-row{
+    display:flex;justify-content:space-between;align-items:center;gap:10px;
+    padding:12px 0;border-bottom:1px solid var(--bord);font-size:13px;
+  }
+  .facture-row:last-child{border-bottom:none;}
+  .facture-row .ddate{font-weight:700;font-size:14.5px;}
+  .facture-row .fdetail{color:#444;margin-top:2px;}
+  .status-badge{
+    border:none;border-radius:20px;padding:7px 13px;font-size:12.5px;font-weight:700;
+    cursor:pointer;white-space:nowrap;flex-shrink:0;
+  }
+  .status-badge.status-red{background:var(--rouge-clair);color:var(--rouge);}
+  .status-badge.status-orange{background:#FDEBD3;color:#B9770E;}
+  .status-badge.status-green{background:var(--vert-clair);color:var(--vert);}
   footer{
     text-align:center;
     font-size:11px;
@@ -290,6 +304,7 @@
   <div class="tabs">
     <button class="tab-btn active" data-tab="pj">Journée</button>
     <button class="tab-btn" data-tab="ps">Saison</button>
+    <button class="tab-btn" data-tab="pf">Factures</button>
   </div>
 </header>
 
@@ -356,6 +371,16 @@
         <option>À facturer</option>
       </select>
     </div>
+    <div class="field">
+      <label>Partenaire</label>
+      <select id="c1_partenaire">
+        <option>Aucun</option>
+        <option>SMS Montana</option>
+        <option>Office la Tzoumaz</option>
+        <option>Frilingue</option>
+      </select>
+    </div>
+    <div class="info-note" id="c1_partner_note" style="display:none;"></div>
   </div>
 
   <div class="card">
@@ -420,6 +445,16 @@
         <option>À facturer</option>
       </select>
     </div>
+    <div class="field">
+      <label>Partenaire</label>
+      <select id="c2_partenaire">
+        <option>Aucun</option>
+        <option>SMS Montana</option>
+        <option>Office la Tzoumaz</option>
+        <option>Frilingue</option>
+      </select>
+    </div>
+    <div class="info-note" id="c2_partner_note" style="display:none;"></div>
   </div>
 
   <div class="card col-c2 hidden-col" id="c2_guides_card">
@@ -465,6 +500,7 @@
     <div class="result-line"><span class="lbl">Matériel</span><span class="val" id="r_mat">-</span></div>
     <div class="result-line"><span class="lbl">Bâtiment</span><span class="val" id="r_bat">-</span></div>
     <div class="result-line total"><span class="lbl">Total salaire guides</span><span class="val" id="r_gtot">-</span></div>
+    <div class="result-line" id="r_commissions_line" style="display:none;"><span class="lbl">Commissions / intermédiaires partenaires</span><span class="val" id="r_commissions">-</span></div>
   </div>
 
   <div class="card">
@@ -640,6 +676,23 @@
 
 </div>
 
+<!-- ============ PAGE FACTURES ============ -->
+<div class="page" id="pf">
+
+  <div class="card">
+    <h2>Journées à facturer</h2>
+    <div id="facture_list">
+      <div class="empty-msg">Aucune journée à facturer pour l'instant.</div>
+    </div>
+    <div class="info-note">Touche le badge pour faire avancer le statut : <b>à facturer</b> → <b>facturé</b> → <b>payé</b> → à facturer...</div>
+  </div>
+
+  <div id="facture_recap">
+    <div class="empty-msg">Rien à répartir pour l'instant.</div>
+  </div>
+
+</div>
+
 </main>
 <footer>Esprit Liberté — Canyon Valsorey</footer>
 <div class="toast" id="toast"></div>
@@ -677,6 +730,90 @@ function guideSalary(a1, a2, r1, r2){
 function canyonPrice(parcours, nb){ return clampNb(nb) * DATA.const[parcours].prix; }
 function canyonMat(parcours, nb){ return clampNb(nb) * DATA.const[parcours].mat; }
 function canyonBat(parcours, nb){ return clampNb(nb) * DATA.const[parcours].bat; }
+
+// ---- Partenaires ----
+// La grille salariale, le matériel et le bâtiment restent TOUJOURS calculés normalement
+// (mêmes fonctions que ci-dessus), quel que soit le partenaire. Seuls le prix facturé/encaissé
+// et une éventuelle commission/rétrocession déduite du solde Esprit Liberté changent.
+const PARTNERS = {
+  'Aucun': null,
+  'SMS Montana': {
+    parcoursAllowed: null, // n'importe quel parcours, tarif standard
+    paiementDefault: 'À facturer',
+    commissionPct: 0.10,
+    commissionLabel: 'Commission SMS Montana'
+  },
+  'Office la Tzoumaz': {
+    parcoursAllowed: ['Initiation', 'Découverte'],
+    tariffs: {
+      'Initiation': {prixPerPers: 95, paiementDefault: 'À facturer', feePerPers: 5, feeLabel: 'Reversé à Gabriel'},
+      'Découverte': {prixPerPers: 50, paiementDefault: 'Payé cash', feePerPers: 0, feeLabel: null}
+    }
+  },
+  'Frilingue': {
+    parcoursAllowed: ['Initiation'],
+    tariffs: {
+      'Initiation': {prixPerPers: 90, paiementDefault: 'Payé cash', feePerPers: 0, feeLabel: null}
+    }
+  }
+};
+
+// Calcule le prix effectif et une éventuelle commission/rétrocession pour un canyon,
+// selon le partenaire choisi. Ne touche jamais au salaire ni au matériel/bâtiment.
+function partnerPricing(partner, parcours, nb){
+  nb = clampNb(nb);
+  const base = {prix: canyonPrice(parcours, nb), paiementDefault: null, commission: 0, commissionLabel: null, restricted: false};
+  if(!partner || partner === 'Aucun') return base;
+  const cfg = PARTNERS[partner];
+  if(!cfg) return base;
+  if(partner === 'SMS Montana'){
+    const prix = canyonPrice(parcours, nb);
+    return {prix, paiementDefault: cfg.paiementDefault, commission: Math.round(prix * cfg.commissionPct), commissionLabel: cfg.commissionLabel, restricted: false};
+  }
+  const t = cfg.tariffs[parcours];
+  if(!t) return {...base, restricted: true};
+  const prix = nb * t.prixPerPers;
+  const commission = t.feePerPers ? nb * t.feePerPers : 0;
+  return {prix, paiementDefault: t.paiementDefault, commission, commissionLabel: t.feeLabel, restricted: false};
+}
+
+function partnerNoteText(partner, parcours, pricing){
+  if(!partner || partner === 'Aucun') return '';
+  if(pricing.restricted) return `⚠ ${partner} ne propose pas ce parcours — tarif standard appliqué à la place.`;
+  if(partner === 'SMS Montana') return `Tarif standard facturé à SMS Montana ; commission de 10% (${fmt(pricing.commission)}) déduite du solde Esprit Liberté.`;
+  if(partner === 'Office la Tzoumaz' && parcours === 'Initiation') return `95.-/pers. facturé à l'office, dont ${fmt(pricing.commission)} reversé à Gabriel.`;
+  if(partner === 'Office la Tzoumaz' && parcours === 'Découverte') return `Tarif continuation Tzoumévasion : 50.-/pers., encaissé cash directement.`;
+  if(partner === 'Frilingue') return `Tarif Frilingue : 90.-/pers., encaissé cash directement.`;
+  return '';
+}
+
+function updatePartnerNote(pfx, partner, parcours, pricing){
+  const note = document.getElementById(pfx+'_partner_note');
+  const txt = partnerNoteText(partner, parcours, pricing);
+  note.textContent = txt;
+  note.style.display = txt ? 'block' : 'none';
+}
+
+// Au changement de partenaire : force le parcours dans la liste autorisée par ce partenaire
+// (si besoin) et pré-remplit le mode de paiement adapté (l'utilisateur reste libre de le changer).
+function onPartnerChange(pfx){
+  const partnerSel = document.getElementById(pfx+'_partenaire');
+  const partner = partnerSel.value;
+  const parcoursSel = document.getElementById(pfx+'_parcours');
+  const paiementSel = document.getElementById(pfx+'_paiement');
+  if(partner !== 'Aucun'){
+    const cfg = PARTNERS[partner];
+    if(cfg.parcoursAllowed && !cfg.parcoursAllowed.includes(parcoursSel.value)){
+      parcoursSel.value = cfg.parcoursAllowed[0];
+    }
+    const pricing = partnerPricing(partner, parcoursSel.value, document.getElementById(pfx+'_nb').value);
+    if(pricing.paiementDefault) paiementSel.value = pricing.paiementDefault;
+  }
+  calcJournee();
+}
+['c1','c2'].forEach(pfx=>{
+  document.getElementById(pfx+'_partenaire').addEventListener('input', ()=>onPartnerChange(pfx));
+});
 
 const GUIDE_ROSTER = ['Antoine','Daniel','Johann','François','Extra'];
 
@@ -845,15 +982,21 @@ document.getElementById('remove_c2').addEventListener('click', ()=>setHas2(false
 function calcJournee(){
   const p1 = document.getElementById('c1_parcours').value;
   const nb1 = clampNb(document.getElementById('c1_nb').value);
-  const prix1 = canyonPrice(p1,nb1), mat1 = canyonMat(p1,nb1), bat1 = canyonBat(p1,nb1);
+  const partner1 = document.getElementById('c1_partenaire').value;
+  const pricing1 = partnerPricing(partner1, p1, nb1);
+  const prix1 = pricing1.prix, mat1 = canyonMat(p1,nb1), bat1 = canyonBat(p1,nb1);
   const r1 = baseRate(p1,nb1), reco1 = nbGuidesReco(p1,nb1);
+  updatePartnerNote('c1', partner1, p1, pricing1);
 
-  let p2=null, nb2=0, prix2=0, mat2=0, bat2=0, r2=0, reco2=0;
+  let p2=null, nb2=0, prix2=0, mat2=0, bat2=0, r2=0, reco2=0, pricing2={commission:0};
   if(has2){
     p2 = document.getElementById('c2_parcours').value;
     nb2 = clampNb(document.getElementById('c2_nb').value);
-    prix2 = canyonPrice(p2,nb2); mat2 = canyonMat(p2,nb2); bat2 = canyonBat(p2,nb2);
+    const partner2 = document.getElementById('c2_partenaire').value;
+    pricing2 = partnerPricing(partner2, p2, nb2);
+    prix2 = pricing2.prix; mat2 = canyonMat(p2,nb2); bat2 = canyonBat(p2,nb2);
     r2 = baseRate(p2,nb2); reco2 = nbGuidesReco(p2,nb2);
+    updatePartnerNote('c2', partner2, p2, pricing2);
   }
 
   const guidesList = buildGuidesMap(nb1, nb2, p1, p2, r1, r2);
@@ -873,13 +1016,21 @@ function calcJournee(){
   });
 
   const prixTotal = prix1+prix2, matTotal = mat1+mat2, batTotal = bat1+bat2;
-  const solde = prixTotal - matTotal - batTotal - totalGuideSalary;
-  const resultat = prixTotal - totalGuideSalary;
+  const commissionsTotal = (pricing1.commission||0) + (pricing2.commission||0);
+  const solde = prixTotal - matTotal - batTotal - totalGuideSalary - commissionsTotal;
+  const resultat = prixTotal - totalGuideSalary - commissionsTotal;
 
   document.getElementById('r_prix').textContent = fmt(prixTotal);
   document.getElementById('r_mat').textContent = fmt(matTotal);
   document.getElementById('r_bat').textContent = fmt(batTotal);
   document.getElementById('r_gtot').textContent = fmt(totalGuideSalary);
+  const commLine = document.getElementById('r_commissions_line');
+  if(commissionsTotal > 0){
+    commLine.style.display = 'block';
+    document.getElementById('r_commissions').textContent = '-' + fmt(commissionsTotal);
+  } else {
+    commLine.style.display = 'none';
+  }
   const soldeLine = document.getElementById('r_solde_line');
   document.getElementById('r_solde').textContent = fmt(solde);
   soldeLine.classList.toggle('neg', solde<0);
@@ -900,20 +1051,35 @@ document.querySelectorAll('#pj input, #pj select').forEach(el=>{
 
 // ---- save day into season ----
 function currentDayRecord(existingId){
+  const oldDay = existingId ? season.find(d=>d.id===existingId) : null;
+  function oldStatus(n){
+    const oc = oldDay && oldDay.canyons.find(c=>c.n===n);
+    return oc ? oc.factureStatus : null;
+  }
   const date = document.getElementById('j_date').value;
   const p1 = document.getElementById('c1_parcours').value;
   const nb1 = clampNb(document.getElementById('c1_nb').value);
   const pay1 = document.getElementById('c1_paiement').value;
+  const partner1 = document.getElementById('c1_partenaire').value;
+  const pricing1 = partnerPricing(partner1, p1, nb1);
   const canyons = [{n:1, moment:'Matin', parcours:p1, nb:nb1, paiement:pay1,
-    prix:canyonPrice(p1,nb1), mat:canyonMat(p1,nb1), bat:canyonBat(p1,nb1)}];
+    prix:pricing1.prix, mat:canyonMat(p1,nb1), bat:canyonBat(p1,nb1),
+    partenaire: partner1 !== 'Aucun' ? partner1 : null,
+    commission: pricing1.commission || 0, commissionLabel: pricing1.commissionLabel || null,
+    factureStatus: pay1 === 'À facturer' ? (oldStatus(1) || 'à facturer') : null}];
   const r1 = baseRate(p1,nb1);
   let r2 = 0, p2 = null, nb2 = 0;
   if(has2){
     p2 = document.getElementById('c2_parcours').value;
     nb2 = clampNb(document.getElementById('c2_nb').value);
     const pay2 = document.getElementById('c2_paiement').value;
+    const partner2 = document.getElementById('c2_partenaire').value;
+    const pricing2 = partnerPricing(partner2, p2, nb2);
     canyons.push({n:2, moment:'Après-midi', parcours:p2, nb:nb2, paiement:pay2,
-      prix:canyonPrice(p2,nb2), mat:canyonMat(p2,nb2), bat:canyonBat(p2,nb2)});
+      prix:pricing2.prix, mat:canyonMat(p2,nb2), bat:canyonBat(p2,nb2),
+      partenaire: partner2 !== 'Aucun' ? partner2 : null,
+      commission: pricing2.commission || 0, commissionLabel: pricing2.commissionLabel || null,
+      factureStatus: pay2 === 'À facturer' ? (oldStatus(2) || 'à facturer') : null});
     r2 = baseRate(p2,nb2);
   }
   const guides = buildGuidesMap(nb1, nb2, p1, p2, r1, r2).map(g=>({
@@ -924,12 +1090,13 @@ function currentDayRecord(existingId){
   const matTotal = canyons.reduce((s,c)=>s+c.mat,0);
   const batTotal = canyons.reduce((s,c)=>s+c.bat,0);
   const salaireTotal = guides.reduce((s,g)=>s+g.salaire,0);
-  const solde = prixTotal - matTotal - batTotal - salaireTotal;
-  const resultat = prixTotal - salaireTotal;
+  const commissionsTotal = canyons.reduce((s,c)=>s+(c.commission||0),0);
+  const solde = prixTotal - matTotal - batTotal - salaireTotal - commissionsTotal;
+  const resultat = prixTotal - salaireTotal - commissionsTotal;
   const id = existingId || (Date.now()+'_'+Math.random().toString(36).slice(2,7));
   const remarque = document.getElementById('j_remarque').value.trim();
   return {id, date, canyons, guides, synced:false, mode:'standard', remarque,
-    totals:{prix:prixTotal, mat:matTotal, bat:batTotal, salaireGuides:salaireTotal, solde, resultat}};
+    totals:{prix:prixTotal, mat:matTotal, bat:batTotal, salaireGuides:salaireTotal, commissions:commissionsTotal, solde, resultat}};
 }
 
 function resetJourneeForm(){
@@ -938,10 +1105,12 @@ function resetJourneeForm(){
   document.getElementById('c1_parcours').value = 'Initiation';
   document.getElementById('c1_nb').value = 1;
   document.getElementById('c1_paiement').value = 'Payé cash';
+  document.getElementById('c1_partenaire').value = 'Aucun';
   setHas2(false);
   document.getElementById('c2_parcours').value = 'Découverte';
   document.getElementById('c2_nb').value = 1;
   document.getElementById('c2_paiement').value = 'Payé cash';
+  document.getElementById('c2_partenaire').value = 'Aucun';
   document.getElementById('day_principal_who').value = 'Antoine';
   document.getElementById('day_principal_extra_nom').value = '';
   toggleExtraInput('day_principal');
@@ -1007,12 +1176,16 @@ function startEditDay(day){
   document.getElementById('c1_parcours').value = c1.parcours;
   document.getElementById('c1_nb').value = c1.nb;
   document.getElementById('c1_paiement').value = c1.paiement;
+  document.getElementById('c1_partenaire').value = c1.partenaire || 'Aucun';
   const c2 = day.canyons.find(c=>c.n===2);
   setHas2(!!c2);
   if(c2){
     document.getElementById('c2_parcours').value = c2.parcours;
     document.getElementById('c2_nb').value = c2.nb;
     document.getElementById('c2_paiement').value = c2.paiement;
+    document.getElementById('c2_partenaire').value = c2.partenaire || 'Aucun';
+  } else {
+    document.getElementById('c2_partenaire').value = 'Aucun';
   }
   const principal = day.guides.find(g=>g.estPrincipal);
   document.getElementById('day_principal_who').value = principal ? principal.guideKey : 'Antoine';
@@ -1227,7 +1400,10 @@ function renderSeason(){
   }
   const sorted = [...season].sort((a,b)=> a.date < b.date ? 1 : a.date > b.date ? -1 : 0);
   list.innerHTML = sorted.map(d=>{
-    const canyonsHtml = d.canyons.map(c=>`${c.moment} : ${c.parcours} (${c.nb} pers., ${c.paiement}) — ${fmt(c.prix)}`).join('<br>');
+    const canyonsHtml = d.canyons.map(c=>{
+      const partnerTxt = c.partenaire ? ` [${c.partenaire}${c.commission ? ', ' + (c.commissionLabel || 'commission') + ' ' + fmt(c.commission) : ''}]` : '';
+      return `${c.moment} : ${c.parcours} (${c.nb} pers., ${c.paiement}) — ${fmt(c.prix)}${partnerTxt}`;
+    }).join('<br>');
     const guidesHtml = d.guides.length
       ? d.guides.map(g=>`${g.nom} : ${fmt(g.salaire)}`).join(' · ')
       : 'aucun guide saisi';
@@ -1319,7 +1495,9 @@ function buildJournalRows(){
   [...season].sort((a,b)=>a.date<b.date?-1:1).forEach(d=>{
     d.canyons.forEach(c=>{
       rows.push({'Date':fmtDateFR(d.date), 'Canyon':c.moment, 'Parcours':c.parcours, 'Nb clients':c.nb,
-        'Paiement':c.paiement, 'Prix (.-)':c.prix, 'Remarque':d.remarque || ''});
+        'Paiement':c.paiement, 'Prix (.-)':c.prix, 'Partenaire':c.partenaire || '',
+        'Commission / intermédiaire (.-)':c.commission || '', 'Détail commission':c.commissionLabel || '',
+        'Statut facture':c.factureStatus || '', 'Remarque':d.remarque || ''});
     });
   });
   return rows;
@@ -1340,6 +1518,7 @@ function buildResumeJourRows(){
   return [...season].sort((a,b)=>a.date<b.date?-1:1).map(d=>({
     'Date':fmtDateFR(d.date), 'Prix total (.-)':d.totals.prix, 'Matériel (.-)':d.totals.mat,
     'Bâtiment (.-)':d.totals.bat, 'Salaire guides (.-)':d.totals.salaireGuides,
+    'Commissions partenaires (.-)':d.totals.commissions || 0,
     'Solde (.-)':d.totals.solde, 'Résultat esprit-liberté (.-)':d.totals.resultat, 'Remarque':d.remarque || ''
   }));
 }
@@ -1379,7 +1558,8 @@ document.getElementById('export_csv').addEventListener('click', ()=>{
     const guidesTxt = d.guides.map(g=>`${g.nom} (${g.salaire})`).join(' / ');
     d.canyons.forEach(c=>{
       rows.push({'Date':fmtDateFR(d.date), 'Canyon':c.moment, 'Parcours':c.parcours, 'Nb clients':c.nb,
-        'Paiement':c.paiement, 'Prix':c.prix, 'Guides (nom/salaire)':guidesTxt, 'Resultat esprit-liberte':d.totals.resultat, 'Remarque':d.remarque || ''});
+        'Paiement':c.paiement, 'Prix':c.prix, 'Partenaire':c.partenaire || '', 'Commission':c.commission || '',
+        'Guides (nom/salaire)':guidesTxt, 'Resultat esprit-liberte':d.totals.resultat, 'Remarque':d.remarque || ''});
     });
   });
   const headers = Object.keys(rows[0]);
@@ -1421,6 +1601,109 @@ document.getElementById('restore-file').addEventListener('change', (ev)=>{
   reader.readAsText(file, 'UTF-8');
 });
 
+// ---- Factures ----
+const FACTURE_CYCLE = ['à facturer', 'facturé', 'payé'];
+function factureStatusMeta(status){
+  if(status === 'payé') return {label:'Payé', cls:'status-green'};
+  if(status === 'facturé') return {label:'Facturé', cls:'status-orange'};
+  return {label:'À facturer', cls:'status-red'};
+}
+function cycleFactureStatus(dayId, canyonN){
+  const day = season.find(d=>d.id === dayId);
+  if(!day) return;
+  const c = day.canyons.find(cc=>cc.n === canyonN);
+  if(!c || c.paiement !== 'À facturer') return;
+  const idx = FACTURE_CYCLE.indexOf(c.factureStatus || 'à facturer');
+  c.factureStatus = FACTURE_CYCLE[(idx+1) % FACTURE_CYCLE.length];
+  day.synced = false;
+  saveSeason();
+  renderFactures();
+  renderSeason();
+  syncDay(day);
+}
+function renderFactures(){
+  const lines = [];
+  season.forEach(d=>{
+    (d.canyons||[]).forEach(c=>{
+      if(c.paiement === 'À facturer') lines.push({day:d, c});
+    });
+  });
+
+  const listEl = document.getElementById('facture_list');
+  if(lines.length === 0){
+    listEl.innerHTML = '<div class="empty-msg">Aucune journée à facturer pour l\'instant.</div>';
+  } else {
+    const sorted = [...lines].sort((a,b)=> a.day.date < b.day.date ? 1 : a.day.date > b.day.date ? -1 : 0);
+    listEl.innerHTML = sorted.map(({day:d,c})=>{
+      const meta = factureStatusMeta(c.factureStatus);
+      const partnerTxt = c.partenaire || 'Sans partenaire';
+      const commTxt = c.commission ? ` · ${c.commissionLabel || 'commission'} ${fmt(c.commission)}` : '';
+      return `<div class="facture-row">
+        <div>
+          <div class="ddate">${fmtDateFR(d.date)} — ${c.moment}</div>
+          <div class="fdetail">${partnerTxt} · ${c.parcours} (${c.nb} pers.) — ${fmt(c.prix)}${commTxt}</div>
+        </div>
+        <button class="status-badge ${meta.cls}" data-dayid="${d.id}" data-canyonn="${c.n}">${meta.label}</button>
+      </div>`;
+    }).join('');
+    listEl.querySelectorAll('.status-badge').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        cycleFactureStatus(btn.dataset.dayid, parseInt(btn.dataset.canyonn));
+      });
+    });
+  }
+
+  // Récapitulatif par partenaire : répartition de ce qui est déjà payé entre les guides
+  // (leur salaire sur ces canyons-là) et Esprit Liberté (le reste), + ce qui est encore en attente.
+  const groups = {};
+  lines.forEach(({day:d,c})=>{
+    const key = c.partenaire || 'Sans partenaire';
+    if(!groups[key]) groups[key] = {facture:0, commission:0, enAttente:0, paye:0, perGuide:{}, elAmount:0};
+    const g = groups[key];
+    g.facture += c.prix;
+    g.commission += (c.commission||0);
+    if(c.factureStatus === 'payé'){
+      g.paye += c.prix;
+      const guidesCanyon = (d.guides||[]).filter(gd => c.n===1 ? gd.canyon1 : gd.canyon2);
+      let salairesCanyon = 0;
+      guidesCanyon.forEach(gd=>{
+        if(!g.perGuide[gd.guideKey]) g.perGuide[gd.guideKey] = {nom:gd.nom, total:0};
+        g.perGuide[gd.guideKey].total += gd.salaire;
+        salairesCanyon += gd.salaire;
+      });
+      g.elAmount += c.prix - c.mat - c.bat - (c.commission||0) - salairesCanyon;
+    } else {
+      g.enAttente += c.prix;
+    }
+  });
+
+  const recapEl = document.getElementById('facture_recap');
+  const keys = Object.keys(groups);
+  if(keys.length === 0){
+    recapEl.innerHTML = '<div class="empty-msg">Rien à répartir pour l\'instant.</div>';
+  } else {
+    recapEl.innerHTML = keys.map(key=>{
+      const g = groups[key];
+      const guideRows = GUIDE_ROSTER.filter(n=>g.perGuide[n]).map(n=>
+        `<div class="sline"><span>${n}</span><b>${fmt(g.perGuide[n].total)}</b></div>`
+      ).join('');
+      return `<div class="card">
+        <h2 class="alt">${key}</h2>
+        <div class="summary-box">
+          <div class="sline"><span>Total facturé</span><b>${fmt(g.facture)}</b></div>
+          ${g.commission ? `<div class="sline"><span>Dont commission / intermédiaire</span><b>-${fmt(g.commission)}</b></div>` : ''}
+          <div class="sline"><span>En attente (pas encore payé)</span><b>${fmt(g.enAttente)}</b></div>
+        </div>
+        <div class="info-note">Répartition du montant déjà payé (${fmt(g.paye)}) :</div>
+        <div class="summary-box" style="margin-top:6px;">
+          ${guideRows || '<div class="sline"><span>Aucun guide</span><b>-</b></div>'}
+          <div class="sline"><span><b>Esprit Liberté</b></span><b>${fmt(g.elAmount)}</b></div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+}
+
 // ---- tabs ----
 document.querySelectorAll('.tab-btn').forEach(btn=>{
   btn.addEventListener('click', ()=>{
@@ -1429,6 +1712,7 @@ document.querySelectorAll('.tab-btn').forEach(btn=>{
     btn.classList.add('active');
     document.getElementById(btn.dataset.tab).classList.add('active');
     if(btn.dataset.tab === 'ps') renderSeason();
+    if(btn.dataset.tab === 'pf') renderFactures();
   });
 });
 
@@ -1441,6 +1725,7 @@ document.querySelectorAll('.tab-btn').forEach(btn=>{
   calcJournee();
   calcManuel();
   renderSeason();
+  renderFactures();
   if(syncUrl) pullFromSheet();
 })();
 </script>
