@@ -732,6 +732,14 @@ function comboSalary(r1, r2){
   const red = total > 650 ? total*0.8 : total;
   return Math.min(red, 1000);
 }
+// Le supplément Découverte Tzoumévasion est un vrai 2ème parcours enchaîné par le(s) même(s)
+// guide(s) que le canyon principal (même journée, même équipe) : il compte donc dans le salaire
+// exactement comme un vrai combo 2 canyons (même réduction -20% au-delà de 650.-, même plafond
+// 1000.-/jour) — seul le prix client change (cash direct, pas facturé à l'office).
+function effectiveRateWithTzSupp(baseR, tzSuppNb){
+  if(!tzSuppNb) return baseR;
+  return comboSalary(baseR, baseRate('Découverte', tzSuppNb));
+}
 function guideSalary(a1, a2, r1, r2){
   if(a1 && a2) return comboSalary(r1,r2);
   if(a1) return r1;
@@ -1051,7 +1059,9 @@ function calcJournee(){
     updateTzSuppField('c2', 'Aucun', null);
   }
 
-  const guidesList = buildGuidesMap(nb1, nb2, p1, p2, r1, r2);
+  const r1eff = effectiveRateWithTzSupp(r1, tzSupp1.nb);
+  const r2eff = effectiveRateWithTzSupp(r2, tzSupp2.nb);
+  const guidesList = buildGuidesMap(nb1, nb2, p1, p2, r1eff, r2eff);
   let totalGuideSalary = 0;
   ['c1_g1','c1_g2','c1_g3','c2_g1','c2_g2','c2_g3'].forEach(pfx=>{
     const el = document.getElementById(pfx+'_sal');
@@ -1139,7 +1149,9 @@ function currentDayRecord(existingId){
       tzSuppNb: tzSupp2.nb, tzSuppPrix: tzSupp2.prix});
     r2 = baseRate(p2,nb2);
   }
-  const guides = buildGuidesMap(nb1, nb2, p1, p2, r1, r2).map(g=>({
+  const r1eff = effectiveRateWithTzSupp(r1, tzSupp1.nb);
+  const r2eff = effectiveRateWithTzSupp(r2, tzSupp2.nb);
+  const guides = buildGuidesMap(nb1, nb2, p1, p2, r1eff, r2eff).map(g=>({
     guideKey:g.guideKey, nom:g.nom, canyon1:g.canyon1, canyon2:g.canyon2,
     salaire:g.salaire, estPrincipal:g.estPrincipal, nbClients:g.nbClients, parcours:g.parcours
   }));
