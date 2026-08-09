@@ -782,8 +782,8 @@ function partnerNoteText(partner, parcours, pricing){
   if(!partner || partner === 'Aucun') return '';
   if(pricing.restricted) return `⚠ ${partner} ne propose pas ce parcours — tarif standard appliqué à la place.`;
   if(partner === 'SMS Montana') return `Tarif standard facturé à SMS Montana ; commission de 10% (${fmt(pricing.commission)}) déduite du solde Esprit Liberté.`;
-  if(partner === 'Office la Tzoumaz' && parcours === 'Initiation') return `95.-/pers. facturé à l'office, dont ${fmt(pricing.commission)} reversé à Gabriel.`;
-  if(partner === 'Office la Tzoumaz' && parcours === 'Découverte') return `Tarif continuation Tzoumévasion : 50.-/pers., encaissé cash directement.`;
+  if(partner === 'Office la Tzoumaz' && parcours === 'Initiation') return `95.-/pers. facturé à l'office, dont ${fmt(pricing.commission)} reversé à Gabriel. Continuation Découverte possible ensuite (optionnelle, pas forcément tout le groupe) : à saisir séparément en Canyon 2.`;
+  if(partner === 'Office la Tzoumaz' && parcours === 'Découverte') return `Supplément continuation Tzoumévasion : 50.-/pers., encaissé cash directement au guide. Optionnel — indique ici seulement le nombre de personnes qui continuent (pas forcément tout le groupe, ex. 4 sur 8).`;
   if(partner === 'Frilingue') return `Tarif Frilingue : 90.-/pers., encaissé cash directement.`;
   return '';
 }
