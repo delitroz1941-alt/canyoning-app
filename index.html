@@ -709,7 +709,8 @@ function fmt(n){
 function clampNb(n){ n=parseInt(n); if(isNaN(n)||n<1) n=1; if(n>25) n=25; return n; }
 function guideRates(parcours, nb){
   nb = clampNb(nb);
-  return DATA.guides[parcours][nb-1];
+  const g = DATA.guides[parcours];
+  return g ? g[nb-1] : [0,0,0];
 }
 function baseRate(parcours, nb){ return guideRates(parcours,nb)[0]; }
 function nbGuidesReco(parcours, nb){
@@ -727,9 +728,9 @@ function guideSalary(a1, a2, r1, r2){
   if(a2) return r2;
   return 0;
 }
-function canyonPrice(parcours, nb){ return clampNb(nb) * DATA.const[parcours].prix; }
-function canyonMat(parcours, nb){ return clampNb(nb) * DATA.const[parcours].mat; }
-function canyonBat(parcours, nb){ return clampNb(nb) * DATA.const[parcours].bat; }
+function canyonPrice(parcours, nb){ const c = DATA.const[parcours]; return c ? clampNb(nb) * c.prix : 0; }
+function canyonMat(parcours, nb){ const c = DATA.const[parcours]; return c ? clampNb(nb) * c.mat : 0; }
+function canyonBat(parcours, nb){ const c = DATA.const[parcours]; return c ? clampNb(nb) * c.bat : 0; }
 
 // ---- Partenaires ----
 // La grille salariale, le matériel et le bâtiment restent TOUJOURS calculés normalement
@@ -1163,7 +1164,13 @@ function setEditMode(on){
 function startEditDay(day){
   document.getElementById('j_date').value = day.date;
   document.getElementById('j_remarque').value = day.remarque || '';
-  if(day.mode === 'manuel'){
+  // Certaines anciennes journées (migrées avant l'introduction du champ "mode") ont
+  // mode:"standard" alors que leur canyon est en réalité une "Grosse journée (manuel)".
+  // On détecte ce cas via le texte du parcours pour éviter de router vers le mauvais
+  // formulaire (ce qui ferait planter le calcul standard sur un parcours inconnu).
+  const c1raw = day.canyons && day.canyons.find(c=>c.n===1);
+  const isLegacyManuel = c1raw && /^Grosse journée/.test(String(c1raw.parcours || ''));
+  if(day.mode === 'manuel' || isLegacyManuel){
     setJourneeMode('manuel');
     loadManualDayForEdit(day);
     setEditMode(day.id);
