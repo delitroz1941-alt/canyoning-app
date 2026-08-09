@@ -847,7 +847,9 @@ function updateTzSuppField(pfx, partner, parcours){
   const prix = nb * TZ_SUPP_PRIX;
   // Même logique que les tables de base : matériel/bâtiment sont déduits pour ces personnes
   // aussi (c'est une vraie descente Découverte), avant de savoir ce qui revient à Esprit Liberté.
-  const mat = canyonMat('Découverte', nb), bat = canyonBat('Découverte', nb);
+  // canyonMat/canyonBat clampent à 1 personne minimum : on ne les appelle donc que si nb>0,
+  // sinon un supplément à 0 personne facturerait quand même le matériel/bâtiment d'1 personne.
+  const mat = nb > 0 ? canyonMat('Découverte', nb) : 0, bat = nb > 0 ? canyonBat('Découverte', nb) : 0;
   note.textContent = nb > 0 ? `= ${fmt(prix)} en cash, versé directement au guide (ne s'ajoute pas à la facture office). Matériel/bâtiment déduits normalement (${fmt(mat+bat)}.-) avant la part Esprit Liberté.` : '';
   return {nb, prix, mat, bat};
 }
@@ -856,7 +858,7 @@ function updateTzSuppField(pfx, partner, parcours){
 function readTzSupp(pfx, partner, parcours){
   if(!isTzSuppApplicable(partner, parcours)) return {nb: 0, prix: 0, mat: 0, bat: 0};
   const nb = clampNb2(document.getElementById(pfx+'_tz_supp_nb').value);
-  return {nb, prix: nb * TZ_SUPP_PRIX, mat: canyonMat('Découverte', nb), bat: canyonBat('Découverte', nb)};
+  return {nb, prix: nb * TZ_SUPP_PRIX, mat: nb > 0 ? canyonMat('Découverte', nb) : 0, bat: nb > 0 ? canyonBat('Découverte', nb) : 0};
 }
 
 // Au changement de partenaire : force le parcours dans la liste autorisée par ce partenaire
@@ -900,33 +902,46 @@ function getSlotList(canyonPrefix){
     return {slotId: pfx, who: document.getElementById(pfx+'_who').value};
   });
 }
+// Renvoie le tarif de LA table qui correspond au guide selon sa place (1er, 2e ou 3e guide,
+// slotIndex 0/1/2) sur ce canyon précis — et non plus systématiquement le tarif du 1er guide
+// pour tout le monde. C'est ce qui fait que les tabelles (ex. Initiation 4 pers = [300,0,0])
+// ne payaient jusqu'ici QUE 300.- au 1er guide en théorie, mais un 2e guide ajouté sur le même
+// canyon touchait aussi 300.- au lieu de 0.- (puisque la case 2e guide de la table est vide).
+function guideRateForSlot(parcours, nb, slotIndex, tzSuppNb){
+  if(slotIndex === 0 && tzSuppNb) return effectiveRateWithTzSupp(parcours, nb, tzSuppNb);
+  const rates = guideRates(parcours, nb);
+  return rates[slotIndex] || 0;
+}
 // Fusionne les sélections faites indépendamment pour Canyon 1 et Canyon 2 :
 // un même guide choisi dans les deux listes fait "combo" (canyon1 ET canyon2).
 // Le guide principal de la journée (responsable du solde) est ajouté même s'il
 // n'apparaît dans aucune des deux listes, pour que le solde reste attribué.
-function buildGuidesMap(nb1, nb2, p1, p2, r1, r2){
+function buildGuidesMap(nb1, nb2, p1, p2, tzSupp1Nb, tzSupp2Nb){
   const map = {};
-  const addSlot = (s, canyonKey) => {
+  const addSlot = (s, canyonKey, idxKey, idx) => {
     if(s.who === 'Aucun') return;
     const nom = slotNom(s.slotId, s.who);
     const key = s.who + (s.who === 'Extra' ? '::'+nom : '');
-    if(!map[key]) map[key] = {guideKey: s.who, nom, canyon1:false, canyon2:false, slotIds:[]};
+    if(!map[key]) map[key] = {guideKey: s.who, nom, canyon1:false, canyon2:false, idx1:null, idx2:null, slotIds:[]};
     map[key][canyonKey] = true;
+    map[key][idxKey] = idx;
     map[key].slotIds.push(s.slotId);
   };
-  getSlotList('c1').forEach(s=>addSlot(s,'canyon1'));
-  if(has2) getSlotList('c2').forEach(s=>addSlot(s,'canyon2'));
+  getSlotList('c1').forEach((s,idx)=>addSlot(s,'canyon1','idx1',idx));
+  if(has2) getSlotList('c2').forEach((s,idx)=>addSlot(s,'canyon2','idx2',idx));
 
   const principalWho = document.getElementById('day_principal_who').value;
   const principalNom = principalWho === 'Extra'
     ? (document.getElementById('day_principal_extra_nom').value.trim() || 'Extra')
     : principalWho;
   const principalKey = principalWho + (principalWho === 'Extra' ? '::'+principalNom : '');
-  if(!map[principalKey]) map[principalKey] = {guideKey: principalWho, nom: principalNom, canyon1:false, canyon2:false, slotIds:[]};
+  if(!map[principalKey]) map[principalKey] = {guideKey: principalWho, nom: principalNom, canyon1:false, canyon2:false, idx1:null, idx2:null, slotIds:[]};
 
   return Object.keys(map).map(key=>{
     const g = map[key];
-    const salaire = guideSalary(g.canyon1, g.canyon2, r1, r2);
+    const rate1 = g.canyon1 ? guideRateForSlot(p1, nb1, g.idx1, tzSupp1Nb) : 0;
+    const rate2 = g.canyon2 ? guideRateForSlot(p2, nb2, g.idx2, tzSupp2Nb) : 0;
+    const salaire = guideSalary(g.canyon1, g.canyon2, rate1, rate2);
     const nbClients = (g.canyon1?nb1:0) + (g.canyon2?nb2:0);
     const parcoursLabel = [g.canyon1?p1:null, g.canyon2?p2:null].filter(Boolean).join(' + ');
     return {guideKey:g.guideKey, nom:g.nom, canyon1:g.canyon1, canyon2:g.canyon2, salaire, nbClients,
@@ -1068,9 +1083,7 @@ function calcJournee(){
     updateTzSuppField('c2', 'Aucun', null);
   }
 
-  const r1eff = effectiveRateWithTzSupp(p1, nb1, tzSupp1.nb);
-  const r2eff = effectiveRateWithTzSupp(p2, nb2, tzSupp2.nb);
-  const guidesList = buildGuidesMap(nb1, nb2, p1, p2, r1eff, r2eff);
+  const guidesList = buildGuidesMap(nb1, nb2, p1, p2, tzSupp1.nb, tzSupp2.nb);
   let totalGuideSalary = 0;
   ['c1_g1','c1_g2','c1_g3','c2_g1','c2_g2','c2_g3'].forEach(pfx=>{
     const el = document.getElementById(pfx+'_sal');
@@ -1158,9 +1171,7 @@ function currentDayRecord(existingId){
       tzSuppNb: tzSupp2.nb, tzSuppPrix: tzSupp2.prix, tzSuppMat: tzSupp2.mat, tzSuppBat: tzSupp2.bat});
     r2 = baseRate(p2,nb2);
   }
-  const r1eff = effectiveRateWithTzSupp(p1, nb1, tzSupp1.nb);
-  const r2eff = effectiveRateWithTzSupp(p2, nb2, tzSupp2.nb);
-  const guides = buildGuidesMap(nb1, nb2, p1, p2, r1eff, r2eff).map(g=>({
+  const guides = buildGuidesMap(nb1, nb2, p1, p2, tzSupp1.nb, tzSupp2.nb).map(g=>({
     guideKey:g.guideKey, nom:g.nom, canyon1:g.canyon1, canyon2:g.canyon2,
     salaire:g.salaire, estPrincipal:g.estPrincipal, nbClients:g.nbClients, parcours:g.parcours
   }));
