@@ -381,6 +381,11 @@
       </select>
     </div>
     <div class="info-note" id="c1_partner_note" style="display:none;"></div>
+    <div class="field" id="c1_tz_supp_field" style="display:none;">
+      <label>Supplément Découverte — combien continuent ? (optionnel, 50.-/pers., cash direct au guide)</label>
+      <input type="number" id="c1_tz_supp_nb" value="0" min="0" max="25">
+      <div class="info-note" id="c1_tz_supp_note"></div>
+    </div>
   </div>
 
   <div class="card">
@@ -455,6 +460,11 @@
       </select>
     </div>
     <div class="info-note" id="c2_partner_note" style="display:none;"></div>
+    <div class="field" id="c2_tz_supp_field" style="display:none;">
+      <label>Supplément Découverte — combien continuent ? (optionnel, 50.-/pers., cash direct au guide)</label>
+      <input type="number" id="c2_tz_supp_nb" value="0" min="0" max="25">
+      <div class="info-note" id="c2_tz_supp_note"></div>
+    </div>
   </div>
 
   <div class="card col-c2 hidden-col" id="c2_guides_card">
@@ -745,10 +755,13 @@ const PARTNERS = {
     commissionLabel: 'Commission SMS Montana'
   },
   'Office la Tzoumaz': {
-    parcoursAllowed: ['Initiation', 'Découverte'],
+    // Ne propose que l'Initiation. Le supplément Découverte (si une partie du groupe
+    // poursuit) se saisit désormais SUR LE MÊME CANYON via le champ dédié (pas un 2ème
+    // canyon) — voir TZ_SUPP_PRIX et le champ "..._tz_supp_nb". Ça laisse le Canyon 2
+    // libre pour un canyon entièrement différent le même jour.
+    parcoursAllowed: ['Initiation'],
     tariffs: {
-      'Initiation': {prixPerPers: 95, paiementDefault: 'À facturer', feePerPers: 5, feeLabel: 'Reversé à Gabriel'},
-      'Découverte': {prixPerPers: 50, paiementDefault: 'Payé cash', feePerPers: 0, feeLabel: null}
+      'Initiation': {prixPerPers: 95, paiementDefault: 'À facturer', feePerPers: 5, feeLabel: 'Reversé à Gabriel'}
     }
   },
   'Frilingue': {
@@ -758,6 +771,14 @@ const PARTNERS = {
     }
   }
 };
+const TZ_SUPP_PRIX = 50; // supplément Découverte Tzoumévasion, par personne, cash direct au guide
+
+// Le champ "supplément Découverte" n'apparaît que pour Office la Tzoumaz + Initiation, sur
+// le MÊME canyon (pas un 2ème canyon séparé). Il représente le nombre de personnes du groupe
+// qui poursuivent en Découverte après l'Initiation (pas forcément tout le groupe).
+function isTzSuppApplicable(partner, parcours){
+  return partner === 'Office la Tzoumaz' && parcours === 'Initiation';
+}
 
 // Calcule le prix effectif et une éventuelle commission/rétrocession pour un canyon,
 // selon le partenaire choisi. Ne touche jamais au salaire ni au matériel/bâtiment.
@@ -782,8 +803,7 @@ function partnerNoteText(partner, parcours, pricing){
   if(!partner || partner === 'Aucun') return '';
   if(pricing.restricted) return `⚠ ${partner} ne propose pas ce parcours — tarif standard appliqué à la place.`;
   if(partner === 'SMS Montana') return `Tarif standard facturé à SMS Montana ; commission de 10% (${fmt(pricing.commission)}) déduite du solde Esprit Liberté.`;
-  if(partner === 'Office la Tzoumaz' && parcours === 'Initiation') return `95.-/pers. facturé à l'office, dont ${fmt(pricing.commission)} reversé à Gabriel. Continuation Découverte possible ensuite (optionnelle, pas forcément tout le groupe) : à saisir séparément en Canyon 2.`;
-  if(partner === 'Office la Tzoumaz' && parcours === 'Découverte') return `Supplément continuation Tzoumévasion : 50.-/pers., encaissé cash directement au guide. Optionnel — indique ici seulement le nombre de personnes qui continuent (pas forcément tout le groupe, ex. 4 sur 8).`;
+  if(partner === 'Office la Tzoumaz' && parcours === 'Initiation') return `95.-/pers. facturé à l'office, dont ${fmt(pricing.commission)} reversé à Gabriel. Si une partie du groupe poursuit en Découverte, indique-le juste en dessous (supplément 50.-/pers., cash, optionnel — pas forcément tout le groupe).`;
   if(partner === 'Frilingue') return `Tarif Frilingue : 90.-/pers., encaissé cash directement.`;
   return '';
 }
@@ -793,6 +813,33 @@ function updatePartnerNote(pfx, partner, parcours, pricing){
   const txt = partnerNoteText(partner, parcours, pricing);
   note.textContent = txt;
   note.style.display = txt ? 'block' : 'none';
+}
+
+// Affiche/masque le champ "supplément Découverte" sur LE MÊME canyon (Office la Tzoumaz +
+// Initiation uniquement) et renvoie le nombre de personnes + le montant correspondant.
+// Si le champ n'est pas applicable, il est masqué et remis à 0 pour ne jamais laisser une
+// vieille valeur ajouter un montant fantôme.
+function updateTzSuppField(pfx, partner, parcours){
+  const field = document.getElementById(pfx+'_tz_supp_field');
+  const input = document.getElementById(pfx+'_tz_supp_nb');
+  const note = document.getElementById(pfx+'_tz_supp_note');
+  const applicable = isTzSuppApplicable(partner, parcours);
+  field.style.display = applicable ? 'block' : 'none';
+  if(!applicable){
+    input.value = 0;
+    return {nb: 0, prix: 0};
+  }
+  const nb = clampNb2(input.value);
+  const prix = nb * TZ_SUPP_PRIX;
+  note.textContent = nb > 0 ? `= ${fmt(prix)} en cash, versé directement au guide (ne s'ajoute pas à la facture office).` : '';
+  return {nb, prix};
+}
+
+// Version "lecture seule" (sans toucher à l'affichage), utilisée lors de l'enregistrement.
+function readTzSupp(pfx, partner, parcours){
+  if(!isTzSuppApplicable(partner, parcours)) return {nb: 0, prix: 0};
+  const nb = clampNb2(document.getElementById(pfx+'_tz_supp_nb').value);
+  return {nb, prix: nb * TZ_SUPP_PRIX};
 }
 
 // Au changement de partenaire : force le parcours dans la liste autorisée par ce partenaire
@@ -988,8 +1035,9 @@ function calcJournee(){
   const prix1 = pricing1.prix, mat1 = canyonMat(p1,nb1), bat1 = canyonBat(p1,nb1);
   const r1 = baseRate(p1,nb1), reco1 = nbGuidesReco(p1,nb1);
   updatePartnerNote('c1', partner1, p1, pricing1);
+  const tzSupp1 = updateTzSuppField('c1', partner1, p1);
 
-  let p2=null, nb2=0, prix2=0, mat2=0, bat2=0, r2=0, reco2=0, pricing2={commission:0};
+  let p2=null, nb2=0, prix2=0, mat2=0, bat2=0, r2=0, reco2=0, pricing2={commission:0}, tzSupp2={nb:0,prix:0};
   if(has2){
     p2 = document.getElementById('c2_parcours').value;
     nb2 = clampNb(document.getElementById('c2_nb').value);
@@ -998,6 +1046,9 @@ function calcJournee(){
     prix2 = pricing2.prix; mat2 = canyonMat(p2,nb2); bat2 = canyonBat(p2,nb2);
     r2 = baseRate(p2,nb2); reco2 = nbGuidesReco(p2,nb2);
     updatePartnerNote('c2', partner2, p2, pricing2);
+    tzSupp2 = updateTzSuppField('c2', partner2, p2);
+  } else {
+    updateTzSuppField('c2', 'Aucun', null);
   }
 
   const guidesList = buildGuidesMap(nb1, nb2, p1, p2, r1, r2);
@@ -1016,7 +1067,8 @@ function calcJournee(){
     });
   });
 
-  const prixTotal = prix1+prix2, matTotal = mat1+mat2, batTotal = bat1+bat2;
+  const tzSuppTotal = tzSupp1.prix + tzSupp2.prix;
+  const prixTotal = prix1+prix2+tzSuppTotal, matTotal = mat1+mat2, batTotal = bat1+bat2;
   const commissionsTotal = (pricing1.commission||0) + (pricing2.commission||0);
   const solde = prixTotal - matTotal - batTotal - totalGuideSalary - commissionsTotal;
   const resultat = prixTotal - totalGuideSalary - commissionsTotal;
@@ -1063,31 +1115,35 @@ function currentDayRecord(existingId){
   const pay1 = document.getElementById('c1_paiement').value;
   const partner1 = document.getElementById('c1_partenaire').value;
   const pricing1 = partnerPricing(partner1, p1, nb1);
+  const tzSupp1 = readTzSupp('c1', partner1, p1);
   const canyons = [{n:1, moment:'Matin', parcours:p1, nb:nb1, paiement:pay1,
     prix:pricing1.prix, mat:canyonMat(p1,nb1), bat:canyonBat(p1,nb1),
     partenaire: partner1 !== 'Aucun' ? partner1 : null,
     commission: pricing1.commission || 0, commissionLabel: pricing1.commissionLabel || null,
-    factureStatus: pay1 === 'À facturer' ? (oldStatus(1) || 'à facturer') : null}];
+    factureStatus: pay1 === 'À facturer' ? (oldStatus(1) || 'à facturer') : null,
+    tzSuppNb: tzSupp1.nb, tzSuppPrix: tzSupp1.prix}];
   const r1 = baseRate(p1,nb1);
-  let r2 = 0, p2 = null, nb2 = 0;
+  let r2 = 0, p2 = null, nb2 = 0, tzSupp2 = {nb:0, prix:0};
   if(has2){
     p2 = document.getElementById('c2_parcours').value;
     nb2 = clampNb(document.getElementById('c2_nb').value);
     const pay2 = document.getElementById('c2_paiement').value;
     const partner2 = document.getElementById('c2_partenaire').value;
     const pricing2 = partnerPricing(partner2, p2, nb2);
+    tzSupp2 = readTzSupp('c2', partner2, p2);
     canyons.push({n:2, moment:'Après-midi', parcours:p2, nb:nb2, paiement:pay2,
       prix:pricing2.prix, mat:canyonMat(p2,nb2), bat:canyonBat(p2,nb2),
       partenaire: partner2 !== 'Aucun' ? partner2 : null,
       commission: pricing2.commission || 0, commissionLabel: pricing2.commissionLabel || null,
-      factureStatus: pay2 === 'À facturer' ? (oldStatus(2) || 'à facturer') : null});
+      factureStatus: pay2 === 'À facturer' ? (oldStatus(2) || 'à facturer') : null,
+      tzSuppNb: tzSupp2.nb, tzSuppPrix: tzSupp2.prix});
     r2 = baseRate(p2,nb2);
   }
   const guides = buildGuidesMap(nb1, nb2, p1, p2, r1, r2).map(g=>({
     guideKey:g.guideKey, nom:g.nom, canyon1:g.canyon1, canyon2:g.canyon2,
     salaire:g.salaire, estPrincipal:g.estPrincipal, nbClients:g.nbClients, parcours:g.parcours
   }));
-  const prixTotal = canyons.reduce((s,c)=>s+c.prix,0);
+  const prixTotal = canyons.reduce((s,c)=>s+c.prix,0) + tzSupp1.prix + tzSupp2.prix;
   const matTotal = canyons.reduce((s,c)=>s+c.mat,0);
   const batTotal = canyons.reduce((s,c)=>s+c.bat,0);
   const salaireTotal = guides.reduce((s,g)=>s+g.salaire,0);
@@ -1107,11 +1163,13 @@ function resetJourneeForm(){
   document.getElementById('c1_nb').value = 1;
   document.getElementById('c1_paiement').value = 'Payé cash';
   document.getElementById('c1_partenaire').value = 'Aucun';
+  document.getElementById('c1_tz_supp_nb').value = 0;
   setHas2(false);
   document.getElementById('c2_parcours').value = 'Découverte';
   document.getElementById('c2_nb').value = 1;
   document.getElementById('c2_paiement').value = 'Payé cash';
   document.getElementById('c2_partenaire').value = 'Aucun';
+  document.getElementById('c2_tz_supp_nb').value = 0;
   document.getElementById('day_principal_who').value = 'Antoine';
   document.getElementById('day_principal_extra_nom').value = '';
   toggleExtraInput('day_principal');
@@ -1184,6 +1242,7 @@ function startEditDay(day){
   document.getElementById('c1_nb').value = c1.nb;
   document.getElementById('c1_paiement').value = c1.paiement;
   document.getElementById('c1_partenaire').value = c1.partenaire || 'Aucun';
+  document.getElementById('c1_tz_supp_nb').value = c1.tzSuppNb || 0;
   const c2 = day.canyons.find(c=>c.n===2);
   setHas2(!!c2);
   if(c2){
@@ -1191,8 +1250,10 @@ function startEditDay(day){
     document.getElementById('c2_nb').value = c2.nb;
     document.getElementById('c2_paiement').value = c2.paiement;
     document.getElementById('c2_partenaire').value = c2.partenaire || 'Aucun';
+    document.getElementById('c2_tz_supp_nb').value = c2.tzSuppNb || 0;
   } else {
     document.getElementById('c2_partenaire').value = 'Aucun';
+    document.getElementById('c2_tz_supp_nb').value = 0;
   }
   const principal = day.guides.find(g=>g.estPrincipal);
   document.getElementById('day_principal_who').value = principal ? principal.guideKey : 'Antoine';
@@ -1372,7 +1433,11 @@ function renderSeason(){
   }
 
   const totalClients = season.reduce((s,d)=>s+d.canyons.reduce((a,c)=>a+c.nb,0),0);
-  const totalCash = season.reduce((s,d)=>s+d.canyons.filter(c=>c.paiement==='Payé cash').reduce((a,c)=>a+c.prix,0),0);
+  // Le supplément Découverte Tzoumévasion (tzSuppPrix) est TOUJOURS du cash, même quand le
+  // canyon principal (Initiation) est "À facturer" — il est donc ajouté au total cash à part,
+  // jamais mélangé dans c.prix (qui reste le seul montant réellement facturé à l'office).
+  const totalCash = season.reduce((s,d)=>s+d.canyons.filter(c=>c.paiement==='Payé cash').reduce((a,c)=>a+c.prix,0),0)
+    + season.reduce((s,d)=>s+d.canyons.reduce((a,c)=>a+(c.tzSuppPrix||0),0),0);
   const totalFacturer = season.reduce((s,d)=>s+d.canyons.filter(c=>c.paiement==='À facturer').reduce((a,c)=>a+c.prix,0),0);
   const totalGuideSal = season.reduce((s,d)=>s+d.totals.salaireGuides,0);
   const totalResultat = season.reduce((s,d)=>s+d.totals.resultat,0);
@@ -1409,7 +1474,8 @@ function renderSeason(){
   list.innerHTML = sorted.map(d=>{
     const canyonsHtml = d.canyons.map(c=>{
       const partnerTxt = c.partenaire ? ` [${c.partenaire}${c.commission ? ', ' + (c.commissionLabel || 'commission') + ' ' + fmt(c.commission) : ''}]` : '';
-      return `${c.moment} : ${c.parcours} (${c.nb} pers., ${c.paiement}) — ${fmt(c.prix)}${partnerTxt}`;
+      const suppTxt = c.tzSuppPrix ? ` + supplément Découverte ${c.tzSuppNb} pers. — ${fmt(c.tzSuppPrix)} (cash)` : '';
+      return `${c.moment} : ${c.parcours} (${c.nb} pers., ${c.paiement}) — ${fmt(c.prix)}${partnerTxt}${suppTxt}`;
     }).join('<br>');
     const guidesHtml = d.guides.length
       ? d.guides.map(g=>`${g.nom} : ${fmt(g.salaire)}`).join(' · ')
@@ -1505,6 +1571,12 @@ function buildJournalRows(){
         'Paiement':c.paiement, 'Prix (.-)':c.prix, 'Partenaire':c.partenaire || '',
         'Commission / intermédiaire (.-)':c.commission || '', 'Détail commission':c.commissionLabel || '',
         'Statut facture':c.factureStatus || '', 'Remarque':d.remarque || ''});
+      // Supplément Découverte Tzoumévasion : même canyon, cash à part, ligne dédiée pour l'audit.
+      if(c.tzSuppPrix){
+        rows.push({'Date':fmtDateFR(d.date), 'Canyon':c.moment+' (supplément)', 'Parcours':'Découverte (supplément)',
+          'Nb clients':c.tzSuppNb, 'Paiement':'Payé cash', 'Prix (.-)':c.tzSuppPrix, 'Partenaire':c.partenaire || '',
+          'Commission / intermédiaire (.-)':'', 'Détail commission':'', 'Statut facture':'', 'Remarque':d.remarque || ''});
+      }
     });
   });
   return rows;
@@ -1567,6 +1639,11 @@ document.getElementById('export_csv').addEventListener('click', ()=>{
       rows.push({'Date':fmtDateFR(d.date), 'Canyon':c.moment, 'Parcours':c.parcours, 'Nb clients':c.nb,
         'Paiement':c.paiement, 'Prix':c.prix, 'Partenaire':c.partenaire || '', 'Commission':c.commission || '',
         'Guides (nom/salaire)':guidesTxt, 'Resultat esprit-liberte':d.totals.resultat, 'Remarque':d.remarque || ''});
+      if(c.tzSuppPrix){
+        rows.push({'Date':fmtDateFR(d.date), 'Canyon':c.moment+' (supplément)', 'Parcours':'Découverte (supplément)',
+          'Nb clients':c.tzSuppNb, 'Paiement':'Payé cash', 'Prix':c.tzSuppPrix, 'Partenaire':c.partenaire || '', 'Commission':'',
+          'Guides (nom/salaire)':guidesTxt, 'Resultat esprit-liberte':'', 'Remarque':d.remarque || ''});
+      }
     });
   });
   const headers = Object.keys(rows[0]);
