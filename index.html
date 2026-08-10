@@ -922,6 +922,19 @@ function guideRateForSlot(parcours, nb, slotIndex){
   const rates = guideRates(parcours, nb);
   return rates[slotIndex] || 0;
 }
+// Le nombre de guides est un choix libre du guide principal (adaptable selon la configuration
+// de la journée et le profil des participants), pas une obligation stricte de la table. Quand
+// PLUS de guides sont engagés que ce que recommande la table pour ce nombre de clients, la table
+// ne donne plus directement le tarif de chacun (elle n'a que 3 colonnes). Méthode : répartir les
+// clients par guide engagé, se rapprocher au plus près du tarif de la table pour ce nombre de
+// clients par guide (le salaire minimum découle directement de la table elle-même, pas d'un
+// plancher fixe), arrondi à la dizaine la plus proche.
+function extraGuideRate(parcours, nb, nbGuidesAssigned){
+  const perGuide = nb / nbGuidesAssigned;
+  const nearestNb = Math.max(1, Math.round(perGuide));
+  const tableRate = baseRate(parcours, nearestNb);
+  return roundToTen(tableRate);
+}
 // Fusionne les sélections faites indépendamment pour Canyon 1 et Canyon 2 :
 // un même guide choisi dans les deux listes fait "combo" (canyon1 ET canyon2).
 // Le guide principal de la journée (responsable du solde) est ajouté même s'il
@@ -958,11 +971,16 @@ function buildGuidesMap(nb1, nb2, p1, p2, tzSupp1Nb, tzSupp2Nb){
   const n2 = slots2.filter(s=>s.who!=='Aucun').length;
   const totalTz1 = tzSupp1Nb ? tzSuppSalaireTotal(p1, nb1, tzSupp1Nb) : null;
   const totalTz2 = tzSupp2Nb ? tzSuppSalaireTotal(p2, nb2, tzSupp2Nb) : null;
+  // Plus de guides engagés sur ce canyon que ce que la table recommande pour ce nombre de
+  // clients : la table (3 colonnes max) ne prévoit alors plus le tarif de chacun -> on bascule
+  // sur la méthode "plus de guides que recommandé" (cf. extraGuideRate) au lieu du tarif de place.
+  const over1 = totalTz1 === null && n1 > nbGuidesReco(p1, nb1);
+  const over2 = totalTz2 === null && n2 > nbGuidesReco(p2, nb2);
 
   return Object.keys(map).map(key=>{
     const g = map[key];
-    const rate1 = g.canyon1 ? (totalTz1 !== null ? roundToTen(totalTz1 / Math.max(n1,1)) : guideRateForSlot(p1, nb1, g.idx1)) : 0;
-    const rate2 = g.canyon2 ? (totalTz2 !== null ? roundToTen(totalTz2 / Math.max(n2,1)) : guideRateForSlot(p2, nb2, g.idx2)) : 0;
+    const rate1 = g.canyon1 ? (totalTz1 !== null ? roundToTen(totalTz1 / Math.max(n1,1)) : (over1 ? extraGuideRate(p1, nb1, n1) : guideRateForSlot(p1, nb1, g.idx1))) : 0;
+    const rate2 = g.canyon2 ? (totalTz2 !== null ? roundToTen(totalTz2 / Math.max(n2,1)) : (over2 ? extraGuideRate(p2, nb2, n2) : guideRateForSlot(p2, nb2, g.idx2))) : 0;
     const salaire = guideSalary(g.canyon1, g.canyon2, rate1, rate2);
     const nbClients = (g.canyon1?nb1:0) + (g.canyon2?nb2:0);
     const parcoursLabel = [g.canyon1?p1:null, g.canyon2?p2:null].filter(Boolean).join(' + ');
