@@ -738,7 +738,10 @@ function nbGuidesRecoWithTzSupp(parcours, nb, tzSuppNb){
 }
 function comboSalary(r1, r2){
   const total = r1+r2;
-  const red = total > 650 ? total*0.8 : total;
+  // r1/r2 sont toujours des multiples de 10 (table, extraGuideRate, ou split du supplément
+  // Tzoumaz), mais total*0.8 ne l'est pas forcément (ex. 680*0.8=544) : on ré-arrondit après
+  // la réduction de 20%, sinon la règle "toujours arrondi à la dizaine" serait violée ici.
+  const red = total > 650 ? roundToTen(total*0.8) : total;
   return Math.min(red, 1000);
 }
 // Le supplément Découverte est un supplément de PRIX (50.-/pers, cash) pour les clients du
