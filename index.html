@@ -1423,8 +1423,17 @@ document.getElementById('save_day').addEventListener('click', ()=>{
 });
 
 // ---- Sync (Google Sheet via Apps Script) ----
+// upsertDay() côté serveur (Code.gs) fait "supprimer les lignes de cet ID puis réécrire" : si
+// DEUX requêtes pour le MÊME jour partent en même temps (ex. le clic "Enregistrer" déclenche
+// syncDay() en tâche de fond, et un syncNow() est lancé juste après avant que la 1ère requête
+// n'ait fini), Apps Script n'a pas de verrou entre les deux — chacune peut faire son "supprimer"
+// avant que l'autre n'ait fait son "ajouter", et le Sheet se retrouve avec 2 lignes en double
+// pour le même jour. syncingIds empêche qu'un même id parte deux fois en parallèle.
+const syncingIds = new Set();
 async function syncDay(rec){
   if(!syncUrl) return;
+  if(syncingIds.has(rec.id)) return; // déjà en cours d'envoi, on ne double pas la requête
+  syncingIds.add(rec.id);
   try{
     const res = await fetch(syncUrl, {
       method: 'POST',
@@ -1442,16 +1451,19 @@ async function syncDay(rec){
     }
   }catch(err){
     showToast('Sauvegardé localement — synchro impossible (hors ligne ?)');
+  }finally{
+    syncingIds.delete(rec.id);
   }
 }
 
 async function syncAllUnsynced(){
   if(!syncUrl){ showToast('Configure d\'abord une URL de synchronisation'); return; }
-  const todo = season.filter(d=>!d.synced);
+  const todo = season.filter(d=>!d.synced && !syncingIds.has(d.id));
   if(todo.length === 0){ showToast('Tout est déjà synchronisé'); return; }
   showToast('Synchronisation de ' + todo.length + ' journée(s)...');
   let okCount = 0;
   for(const d of todo){
+    syncingIds.add(d.id);
     try{
       const res = await fetch(syncUrl, {
         method: 'POST',
@@ -1461,6 +1473,7 @@ async function syncAllUnsynced(){
       const data = await res.json();
       if(data && data.status === 'ok'){ d.synced = true; okCount++; }
     }catch(err){ /* stop on network error, keep unsynced */ }
+    finally{ syncingIds.delete(d.id); }
   }
   saveSeason();
   renderSeason();
