@@ -701,6 +701,10 @@
     <div class="empty-msg">Rien à répartir pour l'instant.</div>
   </div>
 
+  <div id="partner_season_recap">
+    <div class="empty-msg">Aucune journée enregistrée pour l'instant.</div>
+  </div>
+
 </div>
 
 </main>
@@ -991,7 +995,21 @@ function buildGuidesMap(nb1, nb2, p1, p2, tzSupp1Nb, tzSupp2Nb){
     const salaire = guideSalary(g.canyon1, g.canyon2, rate1, rate2);
     const nbClients = (g.canyon1?nb1:0) + (g.canyon2?nb2:0);
     const parcoursLabel = [g.canyon1?p1:null, g.canyon2?p2:null].filter(Boolean).join(' + ');
-    return {guideKey:g.guideKey, nom:g.nom, canyon1:g.canyon1, canyon2:g.canyon2, salaire, nbClients,
+    // Répartition du salaire (utile pour les factures, section 5+) : quand un guide fait les 2
+    // canyons le même jour, son salaire combiné (après réduction éventuelle) est attribué à
+    // chaque canyon au prorata du tarif brut de ce canyon (rate1/rate2), de façon à ce que la
+    // somme des deux parts retombe exactement sur le salaire réel versé au guide ce jour-là.
+    let salaire1 = 0, salaire2 = 0;
+    if(g.canyon1 && g.canyon2){
+      const totalRate = rate1 + rate2;
+      salaire1 = totalRate > 0 ? Math.round(salaire * rate1 / totalRate) : 0;
+      salaire2 = salaire - salaire1;
+    } else if(g.canyon1){
+      salaire1 = salaire;
+    } else if(g.canyon2){
+      salaire2 = salaire;
+    }
+    return {guideKey:g.guideKey, nom:g.nom, canyon1:g.canyon1, canyon2:g.canyon2, salaire, salaire1, salaire2, nbClients,
       parcours: parcoursLabel, estPrincipal: key===principalKey, slotIds:g.slotIds};
   });
 }
@@ -1235,7 +1253,8 @@ function currentDayRecord(existingId){
   }
   const guides = buildGuidesMap(nb1, nb2, p1, p2, tzSupp1.nb, tzSupp2.nb).map(g=>({
     guideKey:g.guideKey, nom:g.nom, canyon1:g.canyon1, canyon2:g.canyon2,
-    salaire:g.salaire, estPrincipal:g.estPrincipal, nbClients:g.nbClients, parcours:g.parcours
+    salaire:g.salaire, salaire1:g.salaire1, salaire2:g.salaire2,
+    estPrincipal:g.estPrincipal, nbClients:g.nbClients, parcours:g.parcours
   }));
   const prixTotal = canyons.reduce((s,c)=>s+c.prix,0) + tzSupp1.prix + tzSupp2.prix;
   const matTotal = canyons.reduce((s,c)=>s+c.mat,0) + tzSupp1.mat + tzSupp2.mat;
@@ -1829,6 +1848,31 @@ function cycleFactureStatus(dayId, canyonN){
   renderSeason();
   syncDay(day);
 }
+// Salaire attribué à UN canyon précis pour chaque guide qui y a travaillé. Pour un guide qui
+// ne fait que ce canyon ce jour-là, c'est simplement son salaire. Pour un guide qui fait les
+// 2 canyons le même jour (salaire combiné, éventuellement réduit au-delà de 650.-, cf. section
+// 4 du document de référence), on utilise le prorata déjà calculé et stocké à l'enregistrement
+// (salaire1/salaire2, cf. buildGuidesMap) : leur somme retombe exactement sur le salaire réel.
+// Les journées enregistrées avant l'introduction de ce champ n'ont pas salaire1/salaire2: on
+// retombe alors sur le salaire complet du guide (meilleure estimation possible sans recalcul).
+function canyonGuidePayouts(day, canyonN){
+  return (day.guides||[]).filter(g => canyonN===1 ? g.canyon1 : g.canyon2).map(g=>{
+    const stored = canyonN===1 ? g.salaire1 : g.salaire2;
+    const montant = (stored !== undefined && stored !== null) ? stored : g.salaire;
+    return {nom:g.nom, montant};
+  });
+}
+// Montant qui revient à Esprit Liberté pour CE canyon : prix facturé/encaissé − matériel −
+// bâtiment − commission éventuelle − salaire(s) guide(s) attribué(s) à ce canyon. Le supplément
+// Tzoumaz (tzSuppPrix) n'apparaît jamais sur la facture (cash direct au guide, moitié/moitié
+// avec Esprit Liberté, section 6) : sa moitié guide est déjà comprise dans le salaire ci-dessus
+// (et donc déjà déduite), donc on rajoute le supplément complet pour neutraliser cette déduction
+// et récupérer la part qui revient réellement à Esprit Liberté sur ce supplément.
+function elAmountForCanyon(c, day){
+  const payouts = canyonGuidePayouts(day, c.n);
+  const salairesCanyon = payouts.reduce((s,p)=>s+p.montant,0);
+  return c.prix - c.mat - c.bat - (c.commission||0) - salairesCanyon + (c.tzSuppPrix||0);
+}
 function renderFactures(){
   const lines = [];
   season.forEach(d=>{
@@ -1846,10 +1890,18 @@ function renderFactures(){
       const meta = factureStatusMeta(c.factureStatus);
       const partnerTxt = c.partenaire || 'Sans partenaire';
       const commTxt = c.commission ? ` · ${c.commissionLabel || 'commission'} ${fmt(c.commission)}` : '';
+      const payouts = canyonGuidePayouts(d, c.n);
+      const guidesTxt = payouts.length
+        ? payouts.map(p=>`${p.nom} ${fmt(p.montant)}`).join(' · ')
+        : 'Aucun guide saisi';
+      const elAmount = elAmountForCanyon(c, d);
+      const tzTxt = c.tzSuppPrix ? ` · supplément Découverte ${c.tzSuppNb} pers. (${fmt(c.tzSuppPrix)}, cash, hors facture)` : '';
       return `<div class="facture-row">
         <div>
           <div class="ddate">${fmtDateFR(d.date)} — ${c.moment}</div>
-          <div class="fdetail">${partnerTxt} · ${c.parcours} (${c.nb} pers.) — ${fmt(c.prix)}${commTxt}</div>
+          <div class="fdetail">${partnerTxt} · ${c.parcours} (${c.nb} pers.) — ${fmt(c.prix)}${commTxt}${tzTxt}</div>
+          <div class="fdetail" style="margin-top:2px;">Guide(s) : ${guidesTxt}</div>
+          <div class="fdetail"><b>Esprit Liberté : ${fmt(elAmount)}</b></div>
         </div>
         <button class="status-badge ${meta.cls}" data-dayid="${d.id}" data-canyonn="${c.n}">${meta.label}</button>
       </div>`;
@@ -1861,55 +1913,83 @@ function renderFactures(){
     });
   }
 
-  // Récapitulatif par partenaire : répartition de ce qui est déjà payé entre les guides
-  // (leur salaire sur ces canyons-là) et Esprit Liberté (le reste), + ce qui est encore en attente.
+  // Suivi de trésorerie par partenaire, sur les seules journées à facturer (facturé / en
+  // attente / payé). Pour la répartition guides / Esprit Liberté sur TOUTE la saison et tous
+  // modes de paiement, voir renderPartnerSeasonRecap() ci-dessous.
   const groups = {};
   lines.forEach(({day:d,c})=>{
     const key = c.partenaire || 'Sans partenaire';
-    if(!groups[key]) groups[key] = {facture:0, commission:0, enAttente:0, paye:0, perGuide:{}, elAmount:0};
+    if(!groups[key]) groups[key] = {facture:0, commission:0, enAttente:0, paye:0};
     const g = groups[key];
     g.facture += c.prix;
     g.commission += (c.commission||0);
-    if(c.factureStatus === 'payé'){
-      g.paye += c.prix;
-      const guidesCanyon = (d.guides||[]).filter(gd => c.n===1 ? gd.canyon1 : gd.canyon2);
-      let salairesCanyon = 0;
-      guidesCanyon.forEach(gd=>{
-        if(!g.perGuide[gd.guideKey]) g.perGuide[gd.guideKey] = {nom:gd.nom, total:0};
-        g.perGuide[gd.guideKey].total += gd.salaire;
-        salairesCanyon += gd.salaire;
-      });
-      g.elAmount += c.prix - c.mat - c.bat - (c.commission||0) - salairesCanyon;
-    } else {
-      g.enAttente += c.prix;
-    }
+    if(c.factureStatus === 'payé') g.paye += c.prix; else g.enAttente += c.prix;
   });
 
   const recapEl = document.getElementById('facture_recap');
   const keys = Object.keys(groups);
   if(keys.length === 0){
-    recapEl.innerHTML = '<div class="empty-msg">Rien à répartir pour l\'instant.</div>';
+    recapEl.innerHTML = '<div class="empty-msg">Rien à facturer pour l\'instant.</div>';
   } else {
     recapEl.innerHTML = keys.map(key=>{
       const g = groups[key];
-      const guideRows = GUIDE_ROSTER.filter(n=>g.perGuide[n]).map(n=>
-        `<div class="sline"><span>${n}</span><b>${fmt(g.perGuide[n].total)}</b></div>`
-      ).join('');
       return `<div class="card">
         <h2 class="alt">${key}</h2>
         <div class="summary-box">
           <div class="sline"><span>Total facturé</span><b>${fmt(g.facture)}</b></div>
           ${g.commission ? `<div class="sline"><span>Dont commission / intermédiaire</span><b>-${fmt(g.commission)}</b></div>` : ''}
+          <div class="sline"><span>Déjà payé</span><b>${fmt(g.paye)}</b></div>
           <div class="sline"><span>En attente (pas encore payé)</span><b>${fmt(g.enAttente)}</b></div>
-        </div>
-        <div class="info-note">Répartition du montant déjà payé (${fmt(g.paye)}) :</div>
-        <div class="summary-box" style="margin-top:6px;">
-          ${guideRows || '<div class="sline"><span>Aucun guide</span><b>-</b></div>'}
-          <div class="sline"><span><b>Esprit Liberté</b></span><b>${fmt(g.elAmount)}</b></div>
         </div>
       </div>`;
     }).join('');
   }
+
+  renderPartnerSeasonRecap();
+}
+
+// Bilan de saison par partenaire : TOUTE la saison, tous modes de paiement confondus (cash ET
+// à facturer), pour répondre à "combien de jours/sorties avec ce partenaire, combien touchent
+// les guides, combien reste pour Esprit Liberté" — indépendamment de l'état de facturation.
+function renderPartnerSeasonRecap(){
+  const el = document.getElementById('partner_season_recap');
+  if(!el) return;
+  const groups = {};
+  season.forEach(d=>{
+    (d.canyons||[]).forEach(c=>{
+      const key = c.partenaire || 'Sans partenaire';
+      if(!groups[key]) groups[key] = {dates:new Set(), sorties:0, perGuide:{}, elAmount:0, prixTotal:0};
+      const g = groups[key];
+      g.dates.add(d.date);
+      g.sorties += 1;
+      g.prixTotal += c.prix + (c.tzSuppPrix||0);
+      canyonGuidePayouts(d, c.n).forEach(p=>{
+        if(!g.perGuide[p.nom]) g.perGuide[p.nom] = 0;
+        g.perGuide[p.nom] += p.montant;
+      });
+      g.elAmount += elAmountForCanyon(c, d);
+    });
+  });
+  const keys = Object.keys(groups).sort((a,b)=> groups[b].sorties - groups[a].sorties);
+  if(keys.length === 0){
+    el.innerHTML = '<div class="empty-msg">Aucune journée enregistrée pour l\'instant.</div>';
+    return;
+  }
+  el.innerHTML = `<h2 style="margin-top:18px;">Bilan de saison par partenaire</h2>` + keys.map(key=>{
+    const g = groups[key];
+    const guideNames = Object.keys(g.perGuide).sort((a,b)=>g.perGuide[b]-g.perGuide[a]);
+    const guideRows = guideNames.map(n=>
+      `<div class="sline"><span>${n}</span><b>${fmt(g.perGuide[n])}</b></div>`
+    ).join('');
+    return `<div class="card">
+      <h2 class="alt">${key}</h2>
+      <div class="info-note">${g.dates.size} jour(s) · ${g.sorties} sortie(s) · chiffre d'affaires ${fmt(g.prixTotal)}</div>
+      <div class="summary-box" style="margin-top:6px;">
+        ${guideRows || '<div class="sline"><span>Aucun guide</span><b>-</b></div>'}
+        <div class="sline"><span><b>Esprit Liberté</b></span><b>${fmt(g.elAmount)}</b></div>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 // ---- tabs ----
