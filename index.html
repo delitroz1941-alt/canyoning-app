@@ -741,19 +741,20 @@ function comboSalary(r1, r2){
   const red = total > 650 ? total*0.8 : total;
   return Math.min(red, 1000);
 }
-// Le supplément Découverte prolonge la même descente pour les clients qui continuent : le
-// parcours Découverte contient déjà le tronçon Initiation, donc pour CES clients-là le guide
-// est payé au tarif Découverte (pas Initiation + Découverte empilés). Les clients qui ne
-// continuent pas restent au tarif Initiation. Les deux sous-groupes sont ensuite combinés avec
-// la même formule que 2 canyons enchaînés (-20% au-delà de 650.-, plafond 1000.-/jour) — si
-// tout le groupe continue, le sous-groupe "restants" est vide (0.-) et le résultat retombe
-// naturellement sur le tarif Découverte seul, conforme aux tabelles de base.
-function effectiveRateWithTzSupp(parcours, nb, tzSuppNb){
-  if(!tzSuppNb) return baseRate(parcours, nb);
-  const restants = nb - tzSuppNb; // n'ont pas continué en Découverte, restés au tarif du parcours initial
-  const rRestants = restants > 0 ? baseRate(parcours, restants) : 0;
-  const rSupp = baseRate('Découverte', tzSuppNb);
-  return comboSalary(rRestants, rSupp);
+// Le supplément Découverte est un supplément de PRIX (50.-/pers, cash) pour les clients du
+// groupe Initiation qui veulent prolonger — ce n'est PAS un 2e canyon au tarif Découverte plein
+// (ce tarif suppose 150.-/pers, une tout autre structure). Pour rester une grille aussi régulière
+// que les tables Initiation/Découverte (et ne jamais faire baisser le salaire quand PLUS de
+// clients continuent), le salaire guide repart du tarif Initiation normal pour tout le groupe
+// inscrit (nb), auquel s'ajoute la moitié du supplément encaissé pour les continuants — l'autre
+// moitié reste acquise à Esprit Liberté. Ex. 8 inscrits (table Initiation = 400.-) + 4 continuants
+// (4×50.-=200.-, dont 100.- pour le guide) = 500.- au total pour le(s) guide(s) de ce canyon.
+// Arrondit à la dizaine la plus proche : le +25.-/pers du supplément Tzoumaz produit des
+// montants comme 425.- ou 475.- qui ne sont pas des coupures pratiques à verser en cash.
+function roundToTen(n){ return Math.round(n/10)*10; }
+function tzSuppSalaireTotal(parcours, nb, tzSuppNb){
+  const base = guideRates(parcours, nb).reduce((s,r)=>s+r, 0);
+  return roundToTen(base + tzSuppNb * (TZ_SUPP_PRIX / 2));
 }
 function guideSalary(a1, a2, r1, r2){
   if(a1 && a2) return comboSalary(r1,r2);
@@ -852,7 +853,8 @@ function updateTzSuppField(pfx, partner, parcours){
     input.value = 0;
     return {nb: 0, prix: 0, mat: 0, bat: 0};
   }
-  const nb = clampNb2(input.value);
+  const nb = clampTzSuppNb(input.value);
+  if(String(input.value) !== String(nb)) input.value = nb; // corrige "1" -> "2" à l'écran
   const prix = nb * TZ_SUPP_PRIX;
   // Le matériel/bâtiment de ces personnes est déjà compté une fois dans le canyon Initiation
   // (mat1/bat1 couvrent TOUS les participants du canyon, y compris ceux qui continuent) : ils
@@ -866,7 +868,7 @@ function updateTzSuppField(pfx, partner, parcours){
 // Version "lecture seule" (sans toucher à l'affichage), utilisée lors de l'enregistrement.
 function readTzSupp(pfx, partner, parcours){
   if(!isTzSuppApplicable(partner, parcours)) return {nb: 0, prix: 0, mat: 0, bat: 0};
-  const nb = clampNb2(document.getElementById(pfx+'_tz_supp_nb').value);
+  const nb = clampTzSuppNb(document.getElementById(pfx+'_tz_supp_nb').value);
   return {nb, prix: nb * TZ_SUPP_PRIX, mat: 0, bat: 0};
 }
 
@@ -950,17 +952,17 @@ function buildGuidesMap(nb1, nb2, p1, p2, tzSupp1Nb, tzSupp2Nb){
   // Quand un supplément Tzoumaz est actif sur un canyon, la table ne prévoit pas de colonne
   // "supplément" par place de guide (1er/2e/3e) : elle ne couvre que le parcours simple. S'il y
   // a plusieurs guides sur ce canyon, le salaire combiné (restants + continuants, cf.
-  // effectiveRateWithTzSupp) est donc réparti à parts égales entre eux, plutôt que d'appliquer à
+  // tzSuppSalaireTotal) est donc réparti à parts égales entre eux, plutôt que d'appliquer à
   // chacun un tarif de place qui ne correspond à rien dans ce cas de figure.
   const n1 = slots1.filter(s=>s.who!=='Aucun').length;
   const n2 = slots2.filter(s=>s.who!=='Aucun').length;
-  const totalTz1 = tzSupp1Nb ? effectiveRateWithTzSupp(p1, nb1, tzSupp1Nb) : null;
-  const totalTz2 = tzSupp2Nb ? effectiveRateWithTzSupp(p2, nb2, tzSupp2Nb) : null;
+  const totalTz1 = tzSupp1Nb ? tzSuppSalaireTotal(p1, nb1, tzSupp1Nb) : null;
+  const totalTz2 = tzSupp2Nb ? tzSuppSalaireTotal(p2, nb2, tzSupp2Nb) : null;
 
   return Object.keys(map).map(key=>{
     const g = map[key];
-    const rate1 = g.canyon1 ? (totalTz1 !== null ? totalTz1 / Math.max(n1,1) : guideRateForSlot(p1, nb1, g.idx1)) : 0;
-    const rate2 = g.canyon2 ? (totalTz2 !== null ? totalTz2 / Math.max(n2,1) : guideRateForSlot(p2, nb2, g.idx2)) : 0;
+    const rate1 = g.canyon1 ? (totalTz1 !== null ? roundToTen(totalTz1 / Math.max(n1,1)) : guideRateForSlot(p1, nb1, g.idx1)) : 0;
+    const rate2 = g.canyon2 ? (totalTz2 !== null ? roundToTen(totalTz2 / Math.max(n2,1)) : guideRateForSlot(p2, nb2, g.idx2)) : 0;
     const salaire = guideSalary(g.canyon1, g.canyon2, rate1, rate2);
     const nbClients = (g.canyon1?nb1:0) + (g.canyon2?nb2:0);
     const parcoursLabel = [g.canyon1?p1:null, g.canyon2?p2:null].filter(Boolean).join(' + ');
@@ -1032,6 +1034,10 @@ function currentManualDayRecord(existingId){
     totals:{prix:montant, mat:0, bat:0, salaireGuides:salaireTotal, solde:resultat, resultat}};
 }
 function clampNb2(n){ n=parseInt(n); if(isNaN(n)||n<0) n=0; return n; }
+// Le supplément Découverte ne se prend jamais seul : soit personne ne continue (0), soit au
+// moins 2 personnes (on n'envoie pas 1 seul client continuer avec le guide). 1 est donc remonté
+// automatiquement à 2.
+function clampTzSuppNb(n){ n = clampNb2(n); if(n === 1) n = 2; return n; }
 
 // ---- state ----
 let has2 = false;
