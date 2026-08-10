@@ -1862,16 +1862,20 @@ function canyonGuidePayouts(day, canyonN){
     return {nom:g.nom, montant};
   });
 }
-// Montant qui revient à Esprit Liberté pour CE canyon : prix facturé/encaissé − matériel −
-// bâtiment − commission éventuelle − salaire(s) guide(s) attribué(s) à ce canyon. Le supplément
-// Tzoumaz (tzSuppPrix) n'apparaît jamais sur la facture (cash direct au guide, moitié/moitié
-// avec Esprit Liberté, section 6) : sa moitié guide est déjà comprise dans le salaire ci-dessus
-// (et donc déjà déduite), donc on rajoute le supplément complet pour neutraliser cette déduction
-// et récupérer la part qui revient réellement à Esprit Liberté sur ce supplément.
+// Montant qui revient à Esprit Liberté pour CE canyon : prix facturé/encaissé − commission
+// éventuelle − salaire(s) guide(s) attribué(s) à ce canyon. Même définition que le "Résultat
+// Esprit Liberté" au niveau de la journée (section 2 du document de référence) : le matériel et
+// le bâtiment ne sont PAS déduits ici (ils sont couverts par l'enveloppe du guide, cf. note de
+// la section 2) — sinon la somme des montants par canyon ne retomberait pas sur le résultat
+// réel de la journée. Le supplément Tzoumaz (tzSuppPrix) n'apparaît jamais sur la facture (cash
+// direct au guide, moitié/moitié avec Esprit Liberté, section 6) : sa moitié guide est déjà
+// comprise dans le salaire ci-dessus (et donc déjà déduite), donc on rajoute le supplément
+// complet pour neutraliser cette déduction et récupérer la part qui revient réellement à
+// Esprit Liberté sur ce supplément.
 function elAmountForCanyon(c, day){
   const payouts = canyonGuidePayouts(day, c.n);
   const salairesCanyon = payouts.reduce((s,p)=>s+p.montant,0);
-  return c.prix - c.mat - c.bat - (c.commission||0) - salairesCanyon + (c.tzSuppPrix||0);
+  return c.prix - (c.commission||0) - salairesCanyon + (c.tzSuppPrix||0);
 }
 function renderFactures(){
   const lines = [];
