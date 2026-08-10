@@ -1949,11 +1949,9 @@ function renderFactures(){
   } else {
     const byPartner = {};
     pending.forEach(({day:d,c})=>{
-      // Les journées sans partenaire (cash direct) ne relèvent pas d'une facturation à
-      // proprement parler : on les retire de cette vue pour ne garder que ce qui doit
-      // vraiment être facturé, par lisibilité.
-      if(!c.partenaire) return;
-      const key = c.partenaire;
+      // Une journée "À facturer" sans partenaire assigné reste quelque chose à facturer
+      // (ex. client direct facturé plus tard) : on la garde dans cette liste, groupée à part.
+      const key = c.partenaire || 'Sans partenaire';
       if(!byPartner[key]) byPartner[key] = [];
       byPartner[key].push({day:d, c});
     });
@@ -1971,11 +1969,20 @@ function renderFactures(){
         const payouts = canyonGuidePayouts(d, c.n);
         const guidesTxt = payouts.length ? payouts.map(p=>`${p.nom} ${fmt(p.montant)}`).join(' · ') : 'Aucun guide saisi';
         const elAmount = elAmountForCanyon(c, d);
+        // Sans partenaire institutionnel pour encaisser, il faut savoir QUI envoie la facture
+        // et récupère le paiement : c'est le guide principal de la journée (celui qui reverse
+        // ensuite le solde à Esprit Liberté), précisé ici pour guider la répartition manuelle.
+        let principalTxt = '';
+        if(key === 'Sans partenaire'){
+          const principal = (d.guides||[]).find(g=>g.estPrincipal);
+          principalTxt = `<div class="fdetail" style="margin-top:2px;">Guide en charge de la facture et de l'encaissement : <b>${principal ? principal.nom : 'non défini'}</b></div>`;
+        }
         return `<div class="facture-row">
           <div>
             <div class="ddate">${fmtDateFR(d.date)} — ${c.moment} · ${c.parcours} (${c.nb} pers.)</div>
             <div class="fdetail"><b>Montant à facturer : ${fmt(invoiceAmount(c))}</b>${commTxt}${tzTxt}</div>
-            <div class="fdetail" style="margin-top:2px;">Guide(s) : ${guidesTxt} · Esprit Liberté : ${fmt(elAmount)}</div>
+            ${principalTxt}
+            <div class="fdetail" style="margin-top:2px;">Répartition à l'encaissement — Guide(s) : ${guidesTxt} · Esprit Liberté : ${fmt(elAmount)}</div>
           </div>
           <button class="status-badge status-red" data-dayid="${d.id}" data-canyonn="${c.n}">À facturer</button>
         </div>`;
