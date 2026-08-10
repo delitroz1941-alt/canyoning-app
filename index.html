@@ -1694,11 +1694,15 @@ function renderGuideDetail(){
     return;
   }
   emptyMsg.style.display = 'none';
-  tbody.innerHTML = rows.map(r=>{
+  const totalSalaire = rows.reduce((s,r)=>s+r.salaire,0);
+  const totalSolde = rows.reduce((s,r)=>s+(r.solde||0),0);
+  let rowsHtml = rows.map(r=>{
     const soldeCell = r.solde === null ? '<span style="color:var(--gris);">-</span>' :
       `<span class="${r.solde<0?'':''}" style="color:${r.solde<0?'var(--rouge)':'var(--vert)'};font-weight:700;">${fmt(r.solde)}</span>`;
     return `<tr><td>${r.date}</td><td>${r.parcours}</td><td>${r.nbClients}</td><td class="num">${fmt(r.salaire)}</td><td style="text-align:right;">${soldeCell}</td></tr>`;
   }).join('');
+  rowsHtml += `<tr style="background:var(--vert-clair);font-weight:700;"><td colspan="3">Total salaire / pour Esprit Liberté</td><td class="num">${fmt(totalSalaire)}</td><td style="text-align:right;">${fmt(totalSolde)}</td></tr>`;
+  tbody.innerHTML = rowsHtml;
 }
 document.getElementById('detail_guide_select').addEventListener('input', renderGuideDetail);
 
@@ -1914,6 +1918,15 @@ function elAmountForCanyon(c, day){
   const salairesCanyon = payouts.reduce((s,p)=>s+p.montant,0);
   return c.prix - (c.commission||0) - salairesCanyon + (c.tzSuppPrix||0);
 }
+// Montant réellement facturé au partenaire. Pour SMS Montana, la commission (10%) est retenue
+// par SMS Montana elle-même avant paiement : ce qu'on facture/reçoit est donc déjà net de la
+// commission. Pour les autres partenaires (ex. Office la Tzoumaz), la commission est une
+// rétrocession qu'Esprit Liberté reverse ensuite de son côté — le partenaire paie le plein tarif
+// et n'entre donc pas dans ce calcul.
+function invoiceAmount(c){
+  if(c.partenaire === 'SMS Montana') return c.prix - (c.commission||0);
+  return c.prix;
+}
 function renderFactures(){
   const lines = [];
   season.forEach(d=>{
@@ -1936,20 +1949,24 @@ function renderFactures(){
   } else {
     const byPartner = {};
     pending.forEach(({day:d,c})=>{
-      const key = c.partenaire || 'Sans partenaire';
+      // Les journées sans partenaire (cash direct) ne relèvent pas d'une facturation à
+      // proprement parler : on les retire de cette vue pour ne garder que ce qui doit
+      // vraiment être facturé, par lisibilité.
+      if(!c.partenaire) return;
+      const key = c.partenaire;
       if(!byPartner[key]) byPartner[key] = [];
       byPartner[key].push({day:d, c});
     });
     const partnerKeys = Object.keys(byPartner).sort((a,b)=>{
-      const totalA = byPartner[a].reduce((s,x)=>s+x.c.prix,0);
-      const totalB = byPartner[b].reduce((s,x)=>s+x.c.prix,0);
+      const totalA = byPartner[a].reduce((s,x)=>s+invoiceAmount(x.c),0);
+      const totalB = byPartner[b].reduce((s,x)=>s+invoiceAmount(x.c),0);
       return totalB - totalA;
     });
     listEl.innerHTML = partnerKeys.map(key=>{
       const entries = [...byPartner[key]].sort((a,b)=> a.day.date < b.day.date ? -1 : a.day.date > b.day.date ? 1 : 0);
-      const total = entries.reduce((s,{c})=>s+c.prix,0) + entries.reduce((s,{c})=>s+(c.tzSuppPrix||0),0);
+      const total = entries.reduce((s,{c})=>s+invoiceAmount(c),0) + entries.reduce((s,{c})=>s+(c.tzSuppPrix||0),0);
       const rowsHtml = entries.map(({day:d,c})=>{
-        const commTxt = c.commission ? ` · ${c.commissionLabel || 'commission'} ${fmt(c.commission)}` : '';
+        const commTxt = c.commission ? ` · ${c.commissionLabel || 'commission'} -${fmt(c.commission)}${c.partenaire==='SMS Montana' ? ' (déjà déduite du montant ci-dessus)' : ''}` : '';
         const tzTxt = c.tzSuppPrix ? ` · supplément Découverte ${c.tzSuppNb} pers. (${fmt(c.tzSuppPrix)}, cash, hors facture)` : '';
         const payouts = canyonGuidePayouts(d, c.n);
         const guidesTxt = payouts.length ? payouts.map(p=>`${p.nom} ${fmt(p.montant)}`).join(' · ') : 'Aucun guide saisi';
@@ -1957,7 +1974,7 @@ function renderFactures(){
         return `<div class="facture-row">
           <div>
             <div class="ddate">${fmtDateFR(d.date)} — ${c.moment} · ${c.parcours} (${c.nb} pers.)</div>
-            <div class="fdetail"><b>Montant à facturer : ${fmt(c.prix)}</b>${commTxt}${tzTxt}</div>
+            <div class="fdetail"><b>Montant à facturer : ${fmt(invoiceAmount(c))}</b>${commTxt}${tzTxt}</div>
             <div class="fdetail" style="margin-top:2px;">Guide(s) : ${guidesTxt} · Esprit Liberté : ${fmt(elAmount)}</div>
           </div>
           <button class="status-badge status-red" data-dayid="${d.id}" data-canyonn="${c.n}">À facturer</button>
@@ -1991,12 +2008,14 @@ function renderFactures(){
   // modes de paiement, voir renderPartnerSeasonRecap() ci-dessous.
   const groups = {};
   lines.forEach(({day:d,c})=>{
-    const key = c.partenaire || 'Sans partenaire';
+    if(!c.partenaire) return; // retiré : "Sans partenaire" n'a rien à facturer, pour plus de lisibilité
+    const key = c.partenaire;
     if(!groups[key]) groups[key] = {facture:0, commission:0, enAttente:0, paye:0};
     const g = groups[key];
-    g.facture += c.prix;
+    const amt = invoiceAmount(c);
+    g.facture += amt;
     g.commission += (c.commission||0);
-    if(c.factureStatus === 'payé') g.paye += c.prix; else g.enAttente += c.prix;
+    if(c.factureStatus === 'payé') g.paye += amt; else g.enAttente += amt;
   });
 
   const recapEl = document.getElementById('facture_recap');
@@ -2006,11 +2025,12 @@ function renderFactures(){
   } else {
     recapEl.innerHTML = keys.map(key=>{
       const g = groups[key];
+      const commTxt = key === 'SMS Montana' ? ' (déjà déduite du total facturé ci-dessus)' : '';
       return `<div class="card">
         <h2 class="alt">${key}</h2>
         <div class="summary-box">
           <div class="sline"><span>Total facturé</span><b>${fmt(g.facture)}</b></div>
-          ${g.commission ? `<div class="sline"><span>Dont commission / intermédiaire</span><b>-${fmt(g.commission)}</b></div>` : ''}
+          ${g.commission ? `<div class="sline"><span>Dont commission / intermédiaire${commTxt}</span><b>-${fmt(g.commission)}</b></div>` : ''}
           <div class="sline"><span>Déjà payé</span><b>${fmt(g.paye)}</b></div>
           <div class="sline"><span>En attente (pas encore payé)</span><b>${fmt(g.enAttente)}</b></div>
         </div>
@@ -2030,7 +2050,8 @@ function renderPartnerSeasonRecap(){
   const groups = {};
   season.forEach(d=>{
     (d.canyons||[]).forEach(c=>{
-      const key = c.partenaire || 'Sans partenaire';
+      if(!c.partenaire) return; // "Sans partenaire" retiré de ce bilan, pour plus de lisibilité
+      const key = c.partenaire;
       if(!groups[key]) groups[key] = {dates:new Set(), sorties:0, perGuide:{}, elAmount:0, prixTotal:0};
       const g = groups[key];
       g.dates.add(d.date);
