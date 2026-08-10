@@ -501,7 +501,7 @@
         </tr>
       </tbody>
     </table>
-    <div class="info-note">Guides recommandés pour ce canyon : <b id="reco2">-</b>. Un guide sélectionné dans les 2 canyons voit son salaire combiné automatiquement (-20% si &gt;650.-, plafond 1000.-).</div>
+    <div class="info-note">Guides recommandés pour ce canyon : <b id="reco2">-</b>. Un guide sélectionné dans les 2 canyons voit son salaire combiné automatiquement (-20% uniquement sur la part qui dépasse 650.-, plafond 1000.-).</div>
   </div>
 
   <div class="card">
@@ -517,7 +517,7 @@
     <h2 class="alt">Pour information</h2>
     <div class="result-line" id="r_solde_line"><span class="lbl">Solde</span><span class="val" id="r_solde">-</span></div>
     <div class="result-line highlight" id="r_resultat_line"><span class="lbl">Résultat esprit-liberté</span><span class="val" id="r_resultat">-</span></div>
-    <div class="info-note">Un guide qui fait les 2 canyons voit son salaire réduit de 20% si le total dépasse 650.-, plafonné à 1000.-/jour. Un guide qui ne fait qu'un seul canyon touche le tarif normal de ce canyon.</div>
+    <div class="info-note">Un guide qui fait les 2 canyons voit la part de son total qui dépasse 650.- réduite de 20% (les 650 premiers francs restent au tarif plein), plafonné à 1000.-/jour. Un guide qui ne fait qu'un seul canyon touche le tarif normal de ce canyon.</div>
   </div>
 
   </div><!-- /standard_mode -->
@@ -736,12 +736,16 @@ function nbGuidesRecoWithTzSupp(parcours, nb, tzSuppNb){
   if(!tzSuppNb) return base;
   return Math.max(base, nbGuidesReco('Découverte', tzSuppNb));
 }
+// La réduction de 20% ne porte QUE sur la part du total personnel du guide qui dépasse
+// 650.- (marginal), pas sur le total entier. Les 650 premiers francs restent donc toujours
+// intégralement acquis au guide ; seul le dépassement est réduit de 20%. Ex. total=700 :
+// 650 (plein tarif) + (700-650)×0.8=40 → 690.- (au lieu de 700×0.8=560.- avec l'ancienne règle).
 function comboSalary(r1, r2){
   const total = r1+r2;
   // r1/r2 sont toujours des multiples de 10 (table, extraGuideRate, ou split du supplément
-  // Tzoumaz), mais total*0.8 ne l'est pas forcément (ex. 680*0.8=544) : on ré-arrondit après
-  // la réduction de 20%, sinon la règle "toujours arrondi à la dizaine" serait violée ici.
-  const red = total > 650 ? roundToTen(total*0.8) : total;
+  // Tzoumaz), mais (total-650)*0.8 ne l'est pas forcément : on ré-arrondit après la réduction,
+  // sinon la règle "toujours arrondi à la dizaine" serait violée ici.
+  const red = total > 650 ? roundToTen(650 + (total-650)*0.8) : total;
   return Math.min(red, 1000);
 }
 // Le supplément Découverte est un supplément de PRIX (50.-/pers, cash) pour les clients du
