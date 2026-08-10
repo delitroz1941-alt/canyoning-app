@@ -1059,13 +1059,13 @@ function currentManualDayRecord(existingId){
     const who = document.getElementById(pfx+'_who').value;
     if(who === 'Aucun') return;
     const sal = parseFloat(document.getElementById(pfx+'_sal').value) || 0;
-    guides.push({guideKey: who, nom: who, canyon1:true, canyon2:false, salaire: sal,
+    guides.push({guideKey: who, nom: who, canyon1:true, canyon2:false, salaire: sal, salaire1: sal, salaire2: 0,
       estPrincipal: false, nbClients: nb, parcours: 'Grosse journée'});
   });
   const extraNom = document.getElementById('m_extra_nom').value.trim();
   const extraSal = parseFloat(document.getElementById('m_extra_sal').value) || 0;
   if(extraNom || extraSal){
-    guides.push({guideKey:'Extra', nom: extraNom || 'Extra', canyon1:true, canyon2:false, salaire: extraSal,
+    guides.push({guideKey:'Extra', nom: extraNom || 'Extra', canyon1:true, canyon2:false, salaire: extraSal, salaire1: extraSal, salaire2: 0,
       estPrincipal: false, nbClients: nb, parcours: 'Grosse journée'});
   }
   if(guides.length > 0) guides[0].estPrincipal = true;
