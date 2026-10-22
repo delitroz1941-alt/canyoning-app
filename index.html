@@ -1962,7 +1962,9 @@ function renderFactures(){
     });
     listEl.innerHTML = partnerKeys.map(key=>{
       const entries = [...byPartner[key]].sort((a,b)=> a.day.date < b.day.date ? -1 : a.day.date > b.day.date ? 1 : 0);
-      const total = entries.reduce((s,{c})=>s+invoiceAmount(c),0) + entries.reduce((s,{c})=>s+(c.tzSuppPrix||0),0);
+      // Le supplément Découverte (tzSuppPrix) est encaissé en cash, hors facture : il n'entre
+      // jamais dans le total à facturer.
+      const total = entries.reduce((s,{c})=>s+invoiceAmount(c),0);
       const rowsHtml = entries.map(({day:d,c})=>{
         const commTxt = c.commission ? ` · ${c.commissionLabel || 'commission'} -${fmt(c.commission)}${c.partenaire==='SMS Montana' ? ' (déjà déduite du montant ci-dessus)' : ''}` : '';
         const tzTxt = c.tzSuppPrix ? ` · supplément Découverte ${c.tzSuppNb} pers. (${fmt(c.tzSuppPrix)}, cash, hors facture)` : '';
