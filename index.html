@@ -357,6 +357,7 @@
           <option>Initiation</option>
           <option>Découverte</option>
           <option>Intégral</option>
+          <option>Cascade de glace</option>
         </select>
       </div>
       <div class="field">
@@ -436,6 +437,7 @@
           <option>Initiation</option>
           <option selected>Découverte</option>
           <option>Intégral</option>
+          <option>Cascade de glace</option>
         </select>
       </div>
       <div class="field">
@@ -711,7 +713,7 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
-const DATA = {"const": {"Initiation": {"prix": 95, "mat": 30, "bat": 10}, "Découverte": {"prix": 150, "mat": 30, "bat": 10}, "Intégral": {"prix": 170, "mat": 30, "bat": 10}}, "guides": {"Initiation": [[200, 0, 0], [200, 0, 0], [250, 0, 0], [300, 0, 0], [300, 0, 0], [350, 0, 0], [350, 0, 0], [400, 0, 0], [450, 0, 0], [500, 0, 0], [400, 400, 0], [400, 400, 0], [400, 400, 0], [400, 400, 0], [400, 400, 0], [450, 450, 0], [450, 450, 0], [500, 500, 0], [500, 500, 0], [500, 500, 0], [450, 450, 450], [450, 450, 450], [500, 500, 500], [500, 500, 500], [500, 500, 500]], "Découverte": [[200, 0, 0], [300, 0, 0], [350, 0, 0], [450, 0, 0], [500, 0, 0], [550, 0, 0], [550, 0, 0], [600, 0, 0], [450, 450, 0], [500, 500, 0], [550, 550, 0], [550, 550, 0], [550, 550, 0], [550, 550, 0], [600, 600, 0], [600, 600, 0], [650, 650, 0], [650, 650, 0], [650, 650, 0], [650, 650, 0], [550, 550, 550], [550, 550, 550], [600, 600, 600], [600, 600, 600], [650, 650, 650]], "Intégral": [[200, 0, 0], [350, 0, 0], [400, 0, 0], [500, 0, 0], [550, 0, 0], [600, 0, 0], [650, 0, 0], [700, 0, 0], [550, 550, 0], [600, 600, 0], [650, 650, 0], [650, 650, 0], [700, 700, 0], [700, 700, 0], [750, 750, 0], [750, 750, 0], [650, 650, 650], [650, 650, 650], [650, 650, 650], [700, 700, 700], [700, 700, 700], [750, 750, 750], [750, 750, 750], [750, 750, 750], [750, 750, 750]]}};
+const DATA = {"const": {"Initiation": {"prix": 95, "mat": 30, "bat": 10}, "Découverte": {"prix": 150, "mat": 30, "bat": 10}, "Intégral": {"prix": 170, "mat": 30, "bat": 10}, "Cascade de glace": {"prix": 95, "mat": 25, "bat": 0}}, "guides": {"Initiation": [[200, 0, 0], [200, 0, 0], [250, 0, 0], [300, 0, 0], [300, 0, 0], [350, 0, 0], [350, 0, 0], [400, 0, 0], [450, 0, 0], [500, 0, 0], [400, 400, 0], [400, 400, 0], [400, 400, 0], [400, 400, 0], [400, 400, 0], [450, 450, 0], [450, 450, 0], [500, 500, 0], [500, 500, 0], [500, 500, 0], [450, 450, 450], [450, 450, 450], [500, 500, 500], [500, 500, 500], [500, 500, 500]], "Découverte": [[200, 0, 0], [300, 0, 0], [350, 0, 0], [450, 0, 0], [500, 0, 0], [550, 0, 0], [550, 0, 0], [600, 0, 0], [450, 450, 0], [500, 500, 0], [550, 550, 0], [550, 550, 0], [550, 550, 0], [550, 550, 0], [600, 600, 0], [600, 600, 0], [650, 650, 0], [650, 650, 0], [650, 650, 0], [650, 650, 0], [550, 550, 550], [550, 550, 550], [600, 600, 600], [600, 600, 600], [650, 650, 650]], "Intégral": [[200, 0, 0], [350, 0, 0], [400, 0, 0], [500, 0, 0], [550, 0, 0], [600, 0, 0], [650, 0, 0], [700, 0, 0], [550, 550, 0], [600, 600, 0], [650, 650, 0], [650, 650, 0], [700, 700, 0], [700, 700, 0], [750, 750, 0], [750, 750, 0], [650, 650, 650], [650, 650, 650], [650, 650, 650], [700, 700, 700], [700, 700, 700], [750, 750, 750], [750, 750, 750], [750, 750, 750], [750, 750, 750]], "Cascade de glace": [[200, 0, 0], [200, 0, 0], [200, 0, 0], [270, 0, 0], [340, 0, 0], [410, 0, 0], [240, 240, 0], [270, 270, 0], [310, 310, 0], [340, 340, 0], [380, 380, 0], [410, 410, 0], [300, 300, 300], [320, 320, 320], [340, 340, 340], [370, 370, 370], [370, 370, 370], [370, 370, 370], [370, 370, 370], [370, 370, 370], [370, 370, 370], [370, 370, 370], [370, 370, 370], [370, 370, 370], [370, 370, 370]]}};
 
 // ---- core calc primitives (validated) ----
 function fmt(n){
@@ -719,8 +721,10 @@ function fmt(n){
   return s + " .-";
 }
 function clampNb(n){ n=parseInt(n); if(isNaN(n)||n<1) n=1; if(n>25) n=25; return n; }
+// Cascade de glace : minimum 2 et maximum 16 personnes.
+function clampNbFor(parcours, n){ n = clampNb(n); if(parcours==='Cascade de glace'){ if(n<2) return 2; if(n>16) return 16; } return n; }
 function guideRates(parcours, nb){
-  nb = clampNb(nb);
+  nb = clampNbFor(parcours, nb);
   const g = DATA.guides[parcours];
   return g ? g[nb-1] : [0,0,0];
 }
@@ -771,9 +775,9 @@ function guideSalary(a1, a2, r1, r2){
   if(a2) return r2;
   return 0;
 }
-function canyonPrice(parcours, nb){ const c = DATA.const[parcours]; return c ? clampNb(nb) * c.prix : 0; }
-function canyonMat(parcours, nb){ const c = DATA.const[parcours]; return c ? clampNb(nb) * c.mat : 0; }
-function canyonBat(parcours, nb){ const c = DATA.const[parcours]; return c ? clampNb(nb) * c.bat : 0; }
+function canyonPrice(parcours, nb){ const c = DATA.const[parcours]; return c ? clampNbFor(parcours, nb) * c.prix : 0; }
+function canyonMat(parcours, nb){ const c = DATA.const[parcours]; return c ? clampNbFor(parcours, nb) * c.mat : 0; }
+function canyonBat(parcours, nb){ const c = DATA.const[parcours]; return c ? clampNbFor(parcours, nb) * c.bat : 0; }
 
 // ---- Partenaires ----
 // La grille salariale, le matériel et le bâtiment restent TOUJOURS calculés normalement
@@ -816,7 +820,7 @@ function isTzSuppApplicable(partner, parcours){
 // Calcule le prix effectif et une éventuelle commission/rétrocession pour un canyon,
 // selon le partenaire choisi. Ne touche jamais au salaire ni au matériel/bâtiment.
 function partnerPricing(partner, parcours, nb){
-  nb = clampNb(nb);
+  nb = clampNbFor(parcours, nb);
   const base = {prix: canyonPrice(parcours, nb), paiementDefault: null, commission: 0, commissionLabel: null, restricted: false};
   if(!partner || partner === 'Aucun') return base;
   const cfg = PARTNERS[partner];
@@ -1143,7 +1147,7 @@ document.getElementById('remove_c2').addEventListener('click', ()=>setHas2(false
 // ---- live calc for Journée page ----
 function calcJournee(){
   const p1 = document.getElementById('c1_parcours').value;
-  const nb1 = clampNb(document.getElementById('c1_nb').value);
+  const nb1 = clampNbFor(p1, document.getElementById('c1_nb').value);
   const partner1 = document.getElementById('c1_partenaire').value;
   const pricing1 = partnerPricing(partner1, p1, nb1);
   const prix1 = pricing1.prix, mat1 = canyonMat(p1,nb1), bat1 = canyonBat(p1,nb1);
@@ -1154,7 +1158,7 @@ function calcJournee(){
   let p2=null, nb2=0, prix2=0, mat2=0, bat2=0, r2=0, reco2=0, pricing2={commission:0}, tzSupp2={nb:0,prix:0,mat:0,bat:0};
   if(has2){
     p2 = document.getElementById('c2_parcours').value;
-    nb2 = clampNb(document.getElementById('c2_nb').value);
+    nb2 = clampNbFor(p2, document.getElementById('c2_nb').value);
     const partner2 = document.getElementById('c2_partenaire').value;
     pricing2 = partnerPricing(partner2, p2, nb2);
     prix2 = pricing2.prix; mat2 = canyonMat(p2,nb2); bat2 = canyonBat(p2,nb2);
@@ -1225,7 +1229,7 @@ function currentDayRecord(existingId){
   }
   const date = document.getElementById('j_date').value;
   const p1 = document.getElementById('c1_parcours').value;
-  const nb1 = clampNb(document.getElementById('c1_nb').value);
+  const nb1 = clampNbFor(p1, document.getElementById('c1_nb').value);
   const pay1 = document.getElementById('c1_paiement').value;
   const partner1 = document.getElementById('c1_partenaire').value;
   const pricing1 = partnerPricing(partner1, p1, nb1);
@@ -1240,7 +1244,7 @@ function currentDayRecord(existingId){
   let r2 = 0, p2 = null, nb2 = 0, tzSupp2 = {nb:0, prix:0, mat:0, bat:0};
   if(has2){
     p2 = document.getElementById('c2_parcours').value;
-    nb2 = clampNb(document.getElementById('c2_nb').value);
+    nb2 = clampNbFor(p2, document.getElementById('c2_nb').value);
     const pay2 = document.getElementById('c2_paiement').value;
     const partner2 = document.getElementById('c2_partenaire').value;
     const pricing2 = partnerPricing(partner2, p2, nb2);
