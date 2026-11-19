@@ -305,6 +305,7 @@
     <button class="tab-btn active" data-tab="pj">Journée</button>
     <button class="tab-btn" data-tab="ps">Saison</button>
     <button class="tab-btn" data-tab="pf">Factures</button>
+    <button class="tab-btn" data-tab="pa">Archives</button>
   </div>
 </header>
 
@@ -681,6 +682,7 @@
       <button class="btn btn-secondary" id="backup_json">Sauvegarde (.json)</button>
       <button class="btn btn-secondary" id="restore_btn">Restaurer</button>
     </div>
+    <button class="btn btn-secondary" id="archive_season" style="margin-top:8px;">Archiver la saison (feuilles de compte par année)</button>
     <button class="btn btn-danger" id="clear_season">Vider la saison</button>
     <input type="file" id="restore-file" accept=".json">
     <div class="info-note">La saison est sauvegardée automatiquement sur ce téléphone. La sauvegarde .json permet de restaurer exactement la saison (recommandé avant de vider ou de changer de téléphone). L'export Excel/CSV sert de rapport lisible, pas d'une sauvegarde exacte.</div>
@@ -705,6 +707,19 @@
     <div class="empty-msg">Aucune journée enregistrée pour l'instant.</div>
   </div>
 
+</div>
+
+<!-- ============ PAGE ARCHIVES ============ -->
+<div class="page" id="pa">
+  <div class="card">
+    <h2>Archives par année</h2>
+    <div class="info-note">Chaque saison archivée garde ses feuilles de compte (résumé, guides, Esprit Liberté, partenaires, détail par guide), conservées dans l'app et dans le Google Sheet (onglets « Archives » et « Comptes AAAA »). Pour archiver : onglet Saison, bouton « Archiver la saison ».</div>
+    <div class="field">
+      <label>Année</label>
+      <select id="arch_year"></select>
+    </div>
+  </div>
+  <div id="arch_content"></div>
 </div>
 
 </main>
@@ -2099,6 +2114,169 @@ function renderPartnerSeasonRecap(){
   }).join('');
 }
 
+
+// ---- Archives par année ----
+// Une saison archivée conserve toutes ses journées (donc ses feuilles de compte) sous son année,
+// dans l'app (localStorage) ET dans le Google Sheet (onglet "Archives" + feuille lisible
+// "Comptes AAAA"). Après archivage, la saison courante repart à 0, y compris côté Sheet.
+const STORAGE_ARCHIVES = 'canyoning_archives_v1';
+function loadArchives(){
+  try{ const raw = localStorage.getItem(STORAGE_ARCHIVES); return raw ? JSON.parse(raw) : {}; }catch(e){ return {}; }
+}
+function saveArchives(){ try{ localStorage.setItem(STORAGE_ARCHIVES, JSON.stringify(archives)); }catch(e){} }
+let archives = loadArchives();
+
+function buildAccounts(days){
+  const acc = {jours: days.length, clients:0, cash:0, facturer:0, salaires:0, resultat:0, guides:{}, partners:{}};
+  GUIDE_ROSTER.forEach(n=>acc.guides[n] = {nom:n, jours:0, total:0, rows:[]});
+  [...days].sort((a,b)=> a.date < b.date ? -1 : a.date > b.date ? 1 : 0).forEach(d=>{
+    (d.canyons||[]).forEach(c=>{
+      acc.clients += c.nb;
+      if(c.paiement === 'Payé cash') acc.cash += c.prix;
+      if(c.paiement === 'À facturer') acc.facturer += c.prix;
+      acc.cash += (c.tzSuppPrix||0);
+      if(c.partenaire){
+        if(!acc.partners[c.partenaire]) acc.partners[c.partenaire] = {nom:c.partenaire, dates:new Set(), sorties:0, ca:0, el:0, perGuide:{}};
+        const g = acc.partners[c.partenaire];
+        g.dates.add(d.date); g.sorties += 1; g.ca += c.prix + (c.tzSuppPrix||0);
+        canyonGuidePayouts(d, c.n).forEach(pp=>{ g.perGuide[pp.nom] = (g.perGuide[pp.nom]||0) + pp.montant; });
+        g.el += elAmountForCanyon(c, d);
+      }
+    });
+    acc.salaires += d.totals.salaireGuides;
+    acc.resultat += d.totals.resultat;
+    (d.guides||[]).forEach(g=>{
+      if(!acc.guides[g.guideKey]) acc.guides[g.guideKey] = {nom:g.guideKey, jours:0, total:0, rows:[]};
+      const x = acc.guides[g.guideKey];
+      x.jours += 1; x.total += g.salaire;
+      x.rows.push({date:d.date, parcours:g.parcours, nbClients:g.nbClients, salaire:g.salaire, solde: g.estPrincipal ? d.totals.resultat : null});
+    });
+  });
+  return acc;
+}
+
+// Lignes de la feuille lisible "Comptes AAAA" écrite dans le Google Sheet.
+function accountsToRows(year, acc){
+  const rows = [['Comptes ' + year + ' — Esprit Liberté'], [],
+    ['Résumé'],
+    ['Jours enregistrés', acc.jours], ['Total clients', acc.clients], ['Total payé cash', acc.cash],
+    ['Total à facturer', acc.facturer], ['Total salaire guides', acc.salaires], ['Résultat Esprit Liberté', acc.resultat], [],
+    ['Compte', 'Jours', 'Total (.-)']];
+  Object.values(acc.guides).forEach(g=>rows.push([g.nom, g.jours, g.total]));
+  rows.push(['Esprit Liberté', acc.jours, acc.resultat], []);
+  const partners = Object.values(acc.partners);
+  if(partners.length){
+    rows.push(['Partenaire', 'Jours', 'Sorties', "Chiffre d'affaires (.-)", 'Esprit Liberté (.-)', 'Salaires par guide']);
+    partners.forEach(p=>rows.push([p.nom, p.dates.size, p.sorties, p.ca, p.el,
+      Object.keys(p.perGuide).map(n=>n+' '+p.perGuide[n]).join(' · ')]));
+    rows.push([]);
+  }
+  Object.values(acc.guides).filter(g=>g.rows.length).forEach(g=>{
+    rows.push(['Détail ' + g.nom], ['Date', 'Parcours', 'Clients', 'Salaire (.-)', 'Solde à verser (.-)']);
+    g.rows.forEach(r=>rows.push([r.date, r.parcours, r.nbClients, r.salaire, r.solde === null ? '' : r.solde]));
+    const totSolde = g.rows.reduce((s,r)=>s+(r.solde||0),0);
+    rows.push(['Total', '', '', g.total, totSolde], []);
+  });
+  return rows;
+}
+
+function renderArchives(){
+  const sel = document.getElementById('arch_year');
+  const content = document.getElementById('arch_content');
+  if(!sel || !content) return;
+  const years = Object.keys(archives).sort().reverse();
+  const current = sel.value;
+  sel.innerHTML = years.map(y=>`<option>${y}</option>`).join('');
+  if(years.length === 0){
+    content.innerHTML = '<div class="empty-msg">Aucune saison archivée pour l\'instant.</div>';
+    return;
+  }
+  if(years.includes(current)) sel.value = current;
+  const year = sel.value;
+  const a = archives[year];
+  const acc = buildAccounts(a.days);
+  const guideRows = Object.values(acc.guides).map(g=>`<tr><td>${g.nom}</td><td>${g.jours}</td><td class="num">${fmt(g.total)}</td></tr>`).join('')
+    + `<tr style="background:var(--vert-clair);font-weight:700;"><td>Esprit Liberté</td><td>${acc.jours}</td><td class="num">${fmt(acc.resultat)}</td></tr>`;
+  const partnersHtml = Object.values(acc.partners).map(p=>`<div class="card">
+      <h2 class="alt">${p.nom}</h2>
+      <div class="info-note">${p.dates.size} jour(s) · ${p.sorties} sortie(s) · chiffre d'affaires ${fmt(p.ca)}</div>
+      <div class="summary-box" style="margin-top:6px;">
+        ${Object.keys(p.perGuide).map(n=>`<div class="sline"><span>${n}</span><b>${fmt(p.perGuide[n])}</b></div>`).join('')}
+        <div class="sline"><span><b>Esprit Liberté</b></span><b>${fmt(p.el)}</b></div>
+      </div></div>`).join('');
+  const detailHtml = Object.values(acc.guides).filter(g=>g.rows.length).map(g=>{
+    const totSolde = g.rows.reduce((s,r)=>s+(r.solde||0),0);
+    return `<div class="card"><h2>Détail — ${g.nom}</h2>
+      <table class="guide-summary-table"><thead><tr><th>Date</th><th>Parcours</th><th>Clients</th><th style="text-align:right;">Salaire</th><th style="text-align:right;">Solde à verser</th></tr></thead><tbody>
+      ${g.rows.map(r=>`<tr><td>${fmtDateFR(r.date)}</td><td>${r.parcours}</td><td>${r.nbClients}</td><td class="num">${fmt(r.salaire)}</td><td style="text-align:right;">${r.solde === null ? '-' : fmt(r.solde)}</td></tr>`).join('')}
+      <tr style="background:var(--vert-clair);font-weight:700;"><td colspan="3">Total</td><td class="num">${fmt(g.total)}</td><td style="text-align:right;">${fmt(totSolde)}</td></tr>
+      </tbody></table></div>`;
+  }).join('');
+  content.innerHTML = `<div class="card"><h2>Résumé ${year}</h2>
+      <div class="info-note">Archivée le ${fmtDateFR(a.archivedAt.slice(0,10))}</div>
+      <div class="summary-box">
+        <div class="sline"><span>Jours enregistrés</span><b>${acc.jours}</b></div>
+        <div class="sline"><span>Total clients</span><b>${acc.clients}</b></div>
+        <div class="sline"><span>Total payé cash</span><b>${fmt(acc.cash)}</b></div>
+        <div class="sline"><span>Total à facturer</span><b>${fmt(acc.facturer)}</b></div>
+        <div class="sline"><span>Total salaire guides</span><b>${fmt(acc.salaires)}</b></div>
+        <div class="sline"><span><b>Résultat esprit-liberté</b></span><b>${fmt(acc.resultat)}</b></div>
+      </div></div>
+    <div class="card"><h2 class="alt">Comptabilités ${year}</h2>
+      <table class="guide-summary-table"><thead><tr><th>Compte</th><th>Jours</th><th style="text-align:right;">Total</th></tr></thead><tbody>${guideRows}</tbody></table></div>
+    ${partnersHtml ? '<h2 style="margin-top:18px;">Partenaires ' + year + '</h2>' + partnersHtml : ''}
+    ${detailHtml}`;
+}
+document.getElementById('arch_year').addEventListener('input', renderArchives);
+
+async function pullArchives(){
+  if(!syncUrl) return;
+  try{
+    const res = await fetch(syncUrl + (syncUrl.indexOf('?') > -1 ? '&' : '?') + 'archives=1');
+    const data = await res.json();
+    if(!data || data.status !== 'ok' || !Array.isArray(data.archives)) return;
+    data.archives.forEach(a=>{ if(a && a.year && Array.isArray(a.days)) archives[a.year] = a; });
+    saveArchives(); renderArchives();
+  }catch(err){ /* hors ligne : on garde les archives locales */ }
+}
+
+async function archiveSeason(){
+  if(season.length === 0){ showToast('Aucune journée à archiver'); return; }
+  const counts = {};
+  season.forEach(d=>{ const y = d.date.slice(0,4); counts[y] = (counts[y]||0) + 1; });
+  const defYear = Object.keys(counts).sort((a,b)=>counts[b]-counts[a])[0];
+  const year = (prompt('Archiver la saison sous quelle année ?', defYear) || '').trim();
+  if(!/^\d{4}$/.test(year)) return;
+  if(!confirm('Archiver ' + season.length + ' journée(s) sous ' + year + ' et remettre la saison à 0 ? Les feuilles de compte restent consultables dans l\'onglet Archives.')) return;
+  if(syncUrl){
+    await syncAllUnsynced();
+    if(season.some(d=>!d.synced)){ showToast('Synchronisation incomplète — archivage annulé, rien n\'a été supprimé'); return; }
+  }
+  const byId = {};
+  (archives[year] ? archives[year].days : []).forEach(d=>{ byId[d.id] = d; });
+  season.forEach(d=>{ byId[d.id] = {...d, synced:true}; });
+  const days = Object.values(byId).sort((a,b)=> a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
+  const archive = {year, archivedAt: new Date().toISOString(), days};
+  if(syncUrl){
+    let ok = false;
+    try{
+      const res = await fetch(syncUrl, {method:'POST', body: JSON.stringify({action:'archive', year, archive, rows: accountsToRows(year, buildAccounts(days))})});
+      const data = await res.json();
+      ok = !!(data && data.status === 'ok');
+    }catch(err){ ok = false; }
+    if(!ok){ showToast('Archive non enregistrée sur le Sheet — rien n\'a été supprimé'); return; }
+  }
+  archives[year] = archive; saveArchives();
+  const ids = season.map(d=>d.id);
+  ids.forEach(id=>{ if(!deletedIds.includes(id)) deletedIds.push(id); });
+  saveDeletedIds();
+  season = []; saveSeason();
+  renderSeason(); renderFactures(); renderArchives();
+  for(const id of ids){ await deleteOnServer(id); }
+  showToast('Saison ' + year + ' archivée — compteurs remis à 0');
+}
+document.getElementById('archive_season').addEventListener('click', archiveSeason);
+
 // ---- tabs ----
 document.querySelectorAll('.tab-btn').forEach(btn=>{
   btn.addEventListener('click', ()=>{
@@ -2108,6 +2286,7 @@ document.querySelectorAll('.tab-btn').forEach(btn=>{
     document.getElementById(btn.dataset.tab).classList.add('active');
     if(btn.dataset.tab === 'ps') renderSeason();
     if(btn.dataset.tab === 'pf') renderFactures();
+    if(btn.dataset.tab === 'pa') renderArchives();
   });
 });
 
@@ -2121,7 +2300,8 @@ document.querySelectorAll('.tab-btn').forEach(btn=>{
   calcManuel();
   renderSeason();
   renderFactures();
-  if(syncUrl){ flushDeletedIds().then(pullFromSheet); }
+  renderArchives();
+  if(syncUrl){ flushDeletedIds().then(pullFromSheet).then(pullArchives); }
 })();
 </script>
 </body>
